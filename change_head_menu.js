@@ -91,7 +91,7 @@
         if (Lampa.Storage.field('head_profile_enabled')) $('.open--profile').removeClass('hide');
         else $('.open--profile').addClass('hide');
 
-        // Блок: Профиль
+        // Блок: Трансляция
         if (Lampa.Storage.field('head_broadcast_enabled')) $('.open--broadcast').removeClass('hide');
         else $('.open--broadcast').addClass('hide');
 
