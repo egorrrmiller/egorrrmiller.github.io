@@ -13,20 +13,20 @@
             .full-start__rate { 
                 display: inline-flex !important; 
                 align-items: center !important; 
-                gap: 9px !important; 
-                margin-right: 18px !important;
+                gap: 12px !important; 
+                margin-right: 25px !important;
                 font-weight: bold !important;
-                /* Увеличено на 15% (было 1.1em -> стало 1.25em) */
-                font-size: 1.25em !important;
+                /* Увеличено еще на 15% (~1.45em) */
+                font-size: 1.45em !important;
             }
             .rate--kp { color: #ff9000 !important; }
             .rate--imdb { color: #f5c518 !important; }
             .rate--tmdb { color: #01b4e4 !important; }
 
             .rate-png-icon {
-                /* Увеличено на 15% (было 1.4em -> стало 1.6em) */
-                width: 1.6em;
-                height: 1.6em;
+                /* Увеличено еще на 15% (~1.85em) */
+                width: 1.85em;
+                height: 1.85em;
                 object-fit: contain;
                 flex-shrink: 0;
             }
@@ -106,13 +106,13 @@
             cache_time: 86400000 
         };
 
-        // Сразу обновляем TMDB (он есть в данных Lampa)
+        // TMDB (мгновенно)
         if (card.vote_average) {
             var tmdb_html = $(`<div class="full-start__rate rate--tmdb"><img src="${png_icons.tmdb}" class="rate-png-icon"><div>${parseFloat(card.vote_average).toFixed(1)}</div></div>`);
             Lampa.Activity.active().activity.render().find('.rate--tmdb').replaceWith(tmdb_html);
         }
 
-        // Поиск в Кинопоиске
+        // Кинопоиск
         var search_url = params.url + 'api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(clean_title);
         network.silent(search_url, function (json) {
             var items = json.films || json.items || [];
