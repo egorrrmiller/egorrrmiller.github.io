@@ -1,7 +1,7 @@
 (function () {
     'use strict';
 
-    // 1. Темплейт по стандарту Lampa (как в src/templates/settings)
+    // Регистрируем темплейт
     Lampa.Template.add('settings_ratings_custom', `
         <div>
             <div class="settings-param selector" data-type="input" data-name="kp_unofficial_token" placeholder="Введите ключ...">
@@ -12,6 +12,7 @@
         </div>
     `);
 
+    // Стили оставляем без изменений
     function addStyles() {
         if ($('#ratings-style-custom').length) return;
         $('body').append(`<style id="ratings-style-custom">
@@ -41,9 +42,6 @@
         tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg'
     };
 
-    /**
-     * РЕГИСТРАЦИЯ КОМПОНЕНТА В НАСТРОЙКАХ
-     */
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
@@ -51,22 +49,31 @@
     });
 
     /**
-     * ОБРАБОТЧИК (аналог src/components/settings/component.js)
+     * ИСПРАВЛЕННЫЙ МЕТОД ОТРИСОВКИ МЕНЮ
      */
     Lampa.Listener.follow('settings', function (e) {
         if (e.type == 'open' && e.name == 'ratings_tweaks') {
             e.body.empty();
             
-            // Создаем элементы из темплейта
+            // 1. Создаем HTML из темплейта
             var body = Lampa.Template.get('settings_ratings_custom', {}, true);
             
-            // Инициализируем механизмы ввода (Input) и выбора (Select) как это делает Lampa
-            // Это заставляет Lampa привязать слушатели к data-name="kp_unofficial_token"
+            // 2. ВАЖНО: Находим все параметры в body и заполняем их текущими значениями из Storage
+            // Это то, что делает Lampa внутри src/components/settings/component.js
+            body.find('.settings-param').each(function(){
+                var name = $(this).data('name');
+                if(name){
+                    var value = Lampa.Storage.get(name);
+                    if(value) $(this).find('.settings-param__value').text(value);
+                }
+            });
+
+            // 3. Инициализируем стандартные обработчики кликов/ввода Lampa
             Lampa.Settings.main().render(body);
             
             e.body.append(body);
             
-            // Управляем навигацией через стандартный контроллер
+            // 4. Добавляем в контроллер для навигации
             Lampa.Controller.add('settings_ratings_ctrl', {
                 toggle: function () {
                     Lampa.Controller.collectionSet(e.body);
@@ -82,12 +89,8 @@
         }
     });
 
-    /**
-     * ЛОГИКА ОТОБРАЖЕНИЯ РЕЙТИНГОВ
-     */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
-        // Используем Storage.get для получения ключа (Lampa сохраняет его автоматически по data-name)
         var kp_token = Lampa.Storage.get('kp_unofficial_token', '24b4fca8-ab26-4c97-a675-f46012545706');
         var clean_title = card.title.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
         
@@ -96,7 +99,6 @@
             headers: { 'X-API-KEY': kp_token }
         };
 
-        // Отрисовка TMDB (сразу)
         if (card.vote_average) {
             var tmdb_html = $(`<div class="full-start__rate rate--tmdb"><img src="${png_icons.tmdb}" class="rate-png-icon"><div>${parseFloat(card.vote_average).toFixed(1)}</div></div>`);
             Lampa.Activity.active().activity.render().find('.rate--tmdb').replaceWith(tmdb_html);
@@ -116,7 +118,6 @@
         function _showRating(kp, imdb) {
             var render = Lampa.Activity.active().activity.render();
             $('.wait_rating', render).remove();
-
             if (kp) {
                 var kp_html = $(`<div class="full-start__rate rate--kp"><img src="${png_icons.kp}" class="rate-png-icon"><div>${parseFloat(kp).toFixed(1)}</div></div>`);
                 $('.rate--kp', render).replaceWith(kp_html);
