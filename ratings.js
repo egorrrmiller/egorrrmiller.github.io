@@ -33,46 +33,44 @@
 
     /**
      * ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ЧЕРЕЗ СТАНДАРТНОЕ API
-    */
-    
-function setupSettings() {  
-    Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');  
-      
-    Lampa.Template.add('settings_ratings_tweaks', `<div>  
-        <div class="settings-param selector" data-name="kp_unofficial_token" data-type="input" placeholder="Введите ключ...">  
-            <div class="settings-param__name">API ключ Кинопоиск</div>  
-            <div class="settings-param__value"></div>  
-            <div class="settings-param__descr">Используется ключ от kinopoiskapiunofficial.tech</div>  
-        </div>  
-    </div>`);  
-      
-    Lampa.SettingsApi.addComponent({  
-        component: 'ratings_tweaks',  
-        name: 'Рейтинги',  
-        icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>',  
-        template: 'settings_ratings_tweaks'  
-    });  
-      
-    // Добавляем слушатель для инициализации параметров  
-    Lampa.Settings.listener.follow('open', function (e) {  
-        if(e.name == 'ratings_tweaks'){  
-            // Инициализация параметров шаблона  
-            Lampa.Settings.update();  
-        }  
-    });  
-}
-    
+     */
+    function setupSettings() {
+        // Регистрируем компонент
+        Lampa.SettingsApi.addComponent({
+            component: 'ratings_tweaks',
+            name: 'Рейтинги',
+            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
+        });
+
+        // Твой код для addParam
+        Lampa.SettingsApi.addParam({
+            component: 'ratings_tweaks',
+            param: {
+                name: 'kp_unofficial_token',
+                type: 'input',
+                default: true, // Поставил рабочий как дефолт
+                placeholder: 'Введите ключ...'
+            },
+            field: {
+                name: 'API ключ Кинопоиск',
+                descr: 'Используется ключ от kinopoiskapiunofficial.tech'
+            },
+            onChange: function (value) {
+                // Валидация формата UUID
+                if (value && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
+                    Lampa.Noty.show('Неверный формат токена');
+                    return false;
+                }
+            }
+        });
+    }
+
     /**
      * ЛОГИКА ОТОБРАЖЕНИЯ
      */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
-        var kp_token = Lampa.Storage.field('kp_unofficial_token');  
-        // Явная проверка  
-        if (kp_token === undefined || kp_token === null) {  
-            kp_token = '24b4fca8-ab26-4c97-a675-f46012545706';  
-        }  
-        
+        var kp_token = Lampa.Storage.get('kp_unofficial_token', '24b4fca8-ab26-4c97-a675-f46012545706');
         var clean_title = card.title.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
         
         var params = {
