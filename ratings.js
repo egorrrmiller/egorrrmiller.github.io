@@ -35,6 +35,8 @@
      * ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ЧЕРЕЗ СТАНДАРТНОЕ API
      */
     function setupSettings() {
+        Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');
+        
         // Регистрируем компонент
         Lampa.SettingsApi.addComponent({
             component: 'ratings_tweaks',
