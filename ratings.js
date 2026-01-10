@@ -1,51 +1,56 @@
 (function () {
     'use strict';
 
-    // Шаблон интерфейса настроек
-    Lampa.Template.add('settings_ratings_custom', `
-        <div>
-            <div class="settings-param selector" data-name="kp_unofficial_token" data-type="input" placeholder="Введите ключ...">
-                <div class="settings-param__name">API ключ Кинопоиск</div>
-                <div class="settings-param__value"></div>
-                <div class="settings-param__descr">Регистрация на kinopoiskapiunofficial.tech. Если "key" — выключено.</div>
-            </div>
-
-            <div class="settings-param selector" data-name="show_imdb_toggle" data-type="trigger">
-                <div class="settings-param__name">Рейтинг IMDB</div>
-                <div class="settings-param__value"></div>
-                <div class="settings-param__descr">Показывать рейтинг IMDB из базы TMDB</div>
-            </div>
-        </div>
-    `);
-
-    // Регистрация раздела в меню настроек
+    // Регистрация раздела в настройках
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
         icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
     });
 
-    // Логика отрисовки и работы кнопок в настройках
+    // Слушатель открытия вкладки настроек
     Lampa.Listener.follow('settings', function (e) {
         if (e.type == 'open' && e.name == 'ratings_tweaks') {
-            var body = $(Lampa.Template.get('settings_ratings_custom', {}));
             
-            // Подгрузка текущих значений из Storage
-            body.find('.settings-param').each(function () {
+            // Генерируем HTML напрямую (самый надежный способ)
+            var html = $(`<div>
+                <div class="settings-param selector" data-name="kp_unofficial_token" data-type="input">
+                    <div class="settings-param__name">API ключ Кинопоиск</div>
+                    <div class="settings-param__value"></div>
+                    <div class="settings-param__descr">Регистрация на kinopoiskapiunofficial.tech. Если "key" — выключено.</div>
+                </div>
+
+                <div class="settings-param selector" data-name="show_imdb_toggle" data-type="trigger">
+                    <div class="settings-param__name">Рейтинг IMDB</div>
+                    <div class="settings-param__value"></div>
+                    <div class="settings-param__descr">Показывать рейтинг IMDB из базы TMDB</div>
+                </div>
+            </div>`);
+
+            // Подставляем актуальные значения из памяти
+            html.find('.settings-param').each(function () {
                 var item = $(this);
                 var name = item.data('name');
                 var val  = Lampa.Storage.get(name, name == 'kp_unofficial_token' ? 'key' : true);
 
-                item.find('.settings-param__value').text(item.data('type') == 'trigger' ? (val ? 'Да' : 'Нет') : (val || 'key'));
+                if (item.data('type') == 'trigger') {
+                    item.find('.settings-param__value').text(val ? 'Да' : 'Нет');
+                } else {
+                    item.find('.settings-param__value').text(val || 'key');
+                }
             });
 
-            e.body.append(body);
+            // Очищаем контейнер и вставляем наш HTML
+            e.body.empty().append(html);
 
-            // Контроллер для навигации пультом
+            // Инициализируем контроллер для навигации пультом
             Lampa.Controller.add('settings_component', {
-                toggle: function () { Lampa.Controller.collectionSet(e.body); Lampa.Controller.render(); },
-                up: function () { Lampa.Select.prev(); },
-                down: function () { Lampa.Select.next(); },
+                toggle: function () {
+                    Lampa.Controller.collectionSet(e.body);
+                    Lampa.Controller.render();
+                },
+                up: Lampa.Select.prev,
+                down: Lampa.Select.next,
                 back: function () { Lampa.Controller.toggle('settings'); },
                 enter: function () {
                     var item = Lampa.Select.active();
@@ -57,20 +62,23 @@
                         item.find('.settings-param__value').text(!cur ? 'Да' : 'Нет');
                     } else {
                         Lampa.Input.edit({ value: Lampa.Storage.get(name, 'key'), free: true }, function (new_val) {
-                            if (new_val) { Lampa.Storage.set(name, new_val); item.find('.settings-param__value').text(new_val); }
+                            if (new_val) {
+                                Lampa.Storage.set(name, new_val);
+                                item.find('.settings-param__value').text(new_val);
+                            }
                         });
                     }
                 }
             });
+
             Lampa.Controller.toggle('settings_component');
         }
     });
 
-    // Основная инициализация плагина
+    // Логика отображения в карточке фильма
     function init() {
-        // Кастомные стили для отображения рейтингов
-        if (!$('#ratings-style-final').length) {
-            $('body').append('<style id="ratings-style-final">' +
+        if (!$('#ratings-style-fix').length) {
+            $('body').append('<style id="ratings-style-fix">' +
                 '.full-start__rate.custom-rate { display: inline-flex !important; align-items: center; gap: 4px; margin-right: 12px; vertical-align: middle; font-weight: normal; }' +
                 '.rate--kp-text { color: #ff9000; }' +
                 '.rate--imdb-text { color: #f5c518; }' +
@@ -78,13 +86,11 @@
                 '</style>');
         }
 
-        // Слушатель открытия карточки фильма
         Lampa.Listener.follow('full', function (e) {
             if (e.type == 'complite') {
                 var rateLine = e.body.find('.full-start-new__rate-line');
                 if (!rateLine.length) return;
 
-                // Очистка и скрытие стандартных блоков
                 rateLine.find('.custom-rate').remove();
                 rateLine.find('.rate--kp, .rate--imdb').hide();
 
@@ -92,7 +98,6 @@
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
                 var kp_token = Lampa.Storage.get('kp_unofficial_token', 'key');
 
-                // Получение данных через TMDB Proxy (ID и IMDB)
                 var network = new Lampa.Reguest();
                 var tmdb_url = 'https://apitmdb.cub.rip/3/' + type + '/' + movie.id + '?api_key=4ef0d7355d9ffb5151e987764708ce96&append_to_response=external_ids&language=ru';
 
@@ -109,7 +114,7 @@
                         }
                     }
 
-                    // Запрос к KP Unofficial, если ключ не "key"
+                    // Запрос к Кинопоиску
                     if (kp_token && kp_token !== 'key' && kp_token.trim() !== '') {
                         var kp_id = (json.external_ids ? json.external_ids.kp_id : null) || movie.id;
                         if (kp_id && !isNaN(kp_id)) {
@@ -131,7 +136,6 @@
         });
     }
 
-    // Проверка готовности приложения
     if (window.appready) init();
     else Lampa.Listener.follow('app', function (e) { if (e.type == 'ready') init(); });
 })();
