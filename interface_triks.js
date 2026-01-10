@@ -17,7 +17,7 @@
         var fixMouseLogic = function() {
             // Убрал блокировку всплытия, чтобы работал нативный скролл
             window.addEventListener('wheel', function(e) {
-                // Пусто, просто даем браузеру крутить
+                e.stopImmediatePropagation();
             }, {passive: true});
 
             var styles = `
