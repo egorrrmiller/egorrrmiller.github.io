@@ -1,43 +1,51 @@
 (function () {
     'use strict';
 
-    // 1. Настройки (с исправлением для предотвращения ошибки undefined)
+    // 1. Предварительная инициализация значений в Storage, если их нет
+    if (Lampa.Storage.get('kp_unofficial_token') === null) Lampa.Storage.set('kp_unofficial_token', 'key');
+    if (Lampa.Storage.get('show_imdb_toggle') === null) Lampa.Storage.set('show_imdb_toggle', true);
+
+    // 2. Регистрация настроек
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
         icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
     });
 
-    Lampa.SettingsApi.addParam({
-        component: 'ratings_tweaks',
-        param: {
-            name: 'kp_unofficial_token',
-            type: 'input',
-            default: 'key'
-        },
-        field: {
-            name: 'API ключ (Unofficial)',
-            description: 'Введите токен с kinopoiskapiunofficial.tech. Если стоит key или пусто - поиск отключен'
-        }
-    });
+    // Добавляем параметры без лишних вложений
+    try {
+        Lampa.SettingsApi.addParam({
+            component: 'ratings_tweaks',
+            param: {
+                name: 'kp_unofficial_token',
+                type: 'input'
+            },
+            field: {
+                name: 'API ключ (Unofficial)',
+                description: 'Вставьте ключ. Если стоит key - поиск отключен.'
+            }
+        });
 
-    Lampa.SettingsApi.addParam({
-        component: 'ratings_tweaks',
-        param: {
-            name: 'show_imdb_toggle',
-            type: 'trigger',
-            default: true
-        },
-        field: {
-            name: 'Рейтинг IMDB',
-            description: 'Отображать балл IMDB желтым цветом'
-        }
-    });
+        Lampa.SettingsApi.addParam({
+            component: 'ratings_tweaks',
+            param: {
+                name: 'show_imdb_toggle',
+                type: 'trigger',
+                default: true
+            },
+            field: {
+                name: 'Рейтинг IMDB',
+                description: 'Показать IMDB'
+            }
+        });
+    } catch (e) {
+        console.log('Ratings Tweaks: Settings error, using defaults.');
+    }
 
     function init() {
-        // Добавление стилей
-        if (!$('#ratings-style-minimal').length) {
-            $('body').append('<style id="ratings-style-minimal">' +
+        // Стили
+        if (!$('#ratings-style-final').length) {
+            $('body').append('<style id="ratings-style-final">' +
                 '.full-start__rate.custom-rate { display: inline-flex !important; align-items: center; gap: 4px; margin-right: 12px; vertical-align: middle; font-weight: normal; }' +
                 '.rate--kp-text { color: #ff9000; }' +
                 '.rate--imdb-text { color: #f5c518; }' +
@@ -50,14 +58,14 @@
                 var rateLine = e.body.find('.full-start-new__rate-line');
                 if (!rateLine.length) return;
 
-                // Чистим старое
+                // Очистка
                 rateLine.find('.custom-rate').remove();
                 rateLine.find('.rate--kp, .rate--imdb').hide();
 
                 var movie = e.data.movie;
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
                 
-                // Читаем настройки
+                // Читаем напрямую из Storage (самый надежный способ)
                 var kp_token = Lampa.Storage.get('kp_unofficial_token', 'key');
                 var show_imdb = Lampa.Storage.get('show_imdb_toggle', true);
 
@@ -78,8 +86,8 @@
                         }
                     }
 
-                    // Отрисовка КП (Условие: ключ не пустой и не равен "key")
-                    if (kp_token && kp_token !== 'key' && kp_token.trim().length > 0) {
+                    // Отрисовка КП (Если ключ не "key" и не пустой)
+                    if (kp_token && kp_token !== 'key' && kp_token.trim() !== '') {
                         var kp_id = (json.external_ids ? json.external_ids.kp_id : null) || movie.id;
                         if (kp_id && !isNaN(kp_id)) {
                             $.ajax({
@@ -100,7 +108,6 @@
         });
     }
 
-    // Старт
     if (window.appready) init();
     else {
         Lampa.Listener.follow('app', function (e) {
