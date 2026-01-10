@@ -10,69 +10,87 @@
 
     // --- ПАРАМЕТРЫ В МЕНЮ ---
 
+    // Поле для ключа KinopoiskAPIUnofficial
     Lampa.SettingsApi.addParam({
         component: 'ratings_tweaks',
-        param: { name: 'show_kp_rating', type: 'trigger', default: true },
-        field: { name: 'Рейтинг Кинопоиск', description: 'Показать балл KP с иконкой' }
+        param: { name: 'ratings_kp_unofficial_key', type: 'input', default: '' },
+        field: { 
+            name: 'API ключ (Unofficial)', 
+            description: 'Получить на kinopoiskapiunofficial.tech. Если поле пустое — рейтинг KP не отображается.' 
+        }
     });
 
+    // Настройка IMDB
     Lampa.SettingsApi.addParam({
         component: 'ratings_tweaks',
         param: { name: 'show_imdb_rating', type: 'trigger', default: true },
-        field: { name: 'Рейтинг IMDB', description: 'Показать балл IMDB с иконкой' }
+        field: { name: 'Рейтинг IMDB', description: 'Показать IMDB (желтый текст)' }
     });
 
     function initRatings() {
         // --- СТИЛИ ---
         var style = $('<style>' +
-            '.full-start__rate.custom-rate { display: inline-flex !important; align-items: center; gap: 6px; margin-right: 12px; vertical-align: middle; }' +
-            '.full-start__rate.custom-rate div:first-child { font-size: 1.1em; font-weight: bold; line-height: 1; }' +
-            '.full-start__rate.custom-rate svg { width: 1.3em; height: 1.3em; display: block; }' +
-            '.rate--kp-icon { color: #ff9000; }' +
-            '.rate--imdb-icon { color: #f5c518; }' +
+            '.full-start__rate.custom-rate { display: inline-flex !important; align-items: center; gap: 4px; margin-right: 12px; vertical-align: middle; font-weight: normal; }' +
+            '.rate--kp-text { color: #ff9000; }' +
+            '.rate--imdb-text { color: #f5c518; }' +
+            '.custom-rate .source-label { font-size: 0.8em; opacity: 0.7; margin-left: 2px; }' +
             '</style>');
         $('body').append(style);
-
-        // --- ИКОНКИ ---
-        var icons = {
-            kp: '<svg class="rate--kp-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M18.17 4.142c-.476 0-.86.386-.86.861v14c0 .476.384.86.86.86h.861c.476 0 .861-.384.861-.86v-14a.861.861 0 0 0-.86-.861h-.862zM3.86 4.142c-.475 0-.86.386-.86.861v14c0 .476.385.86.86.86h.862c.476 0 .86-.384.86-.86v-5.286l3.41 5.286h1.258l-3.832-5.717 3.551-3.665h-1.12L5.581 9.471V5.003a.861.861 0 0 0-.86-.861H3.86zM11.583 4.142c-.476 0-.861.386-.861.861v14c0 .476.385.86.861.86h.86a.86.86 0 0 0 .86-.86v-14a.86.86 0 0 0-.86-.861h-.86z"/></svg>',
-            imdb: '<svg class="rate--imdb-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M22.067 4H1.933C.866 4 0 4.866 0 5.933v12.134C0 19.134.866 20 1.933 20h20.134c1.067 0 1.933-.866 1.933-1.933V5.933C24 4.866 23.134 4 22.067 4zM6.556 15.421H4.665V8.632h1.891v6.789zm4.276 0H8.941V8.632h1.891v6.789zm5.556-2.616c0 .425-.054.79-.161 1.096-.107.306-.263.556-.467.751-.203.195-.453.338-.751.428-.297.091-.635.136-1.012.136h-1.892V8.632h1.892c.365 0 .692.043.982.128.29.085.532.22.727.404.195.184.341.424.439.719.098.295.147.653.147 1.074v1.848zm4.056 2.616h-1.943l-1.066-2.502-1.067 2.502H18.37l-1.631-6.789h1.942l.756 3.75 1.109-3.75h1.942l-1.632 6.789z"/></svg>'
-        };
 
         Lampa.Listener.follow('full', function (e) {
             if (e.type == 'complite') {
                 var rateLine = e.body.find('.full-start-new__rate-line');
                 var movie = e.data.movie;
                 var type = movie.number_of_seasons ? 'tv' : 'movie';
+                var kp_key = Lampa.Storage.field('ratings_kp_unofficial_key');
 
-                // --- ЗАПРОС К ЗЕРКАЛУ ---
+                // Очистка и подготовка строки
+                if (rateLine.length) {
+                    rateLine.find('.custom-rate').remove();
+                    rateLine.find('.rate--kp, .rate--imdb').hide();
+                }
+
+                // --- ШАГ 1: Запрос к TMDB Proxy для получения внешних ID и IMDB ---
                 var network = new Lampa.Reguest();
-                var url = 'https://apitmdb.cub.rip/3/' + type + '/' + movie.id + '?api_key=4ef0d7355d9ffb5151e987764708ce96&append_to_response=external_ids&language=ru';
+                var tmdb_url = 'https://apitmdb.cub.rip/3/' + type + '/' + movie.id + '?api_key=4ef0d7355d9ffb5151e987764708ce96&append_to_response=external_ids&language=ru';
 
-                network.silent(url, function (json) {
-                    if (rateLine.length) {
-                        rateLine.find('.custom-rate').remove();
-                        rateLine.find('.rate--kp, .rate--imdb').hide();
-
-                        // --- ПОИСК РЕЙТИНГА КИНОПОИСК (Расширенный поиск) ---
-                        // Ищем в корне, в объекте votes или в e.data.movie (если уже пришел ранее)
-                        var kp_raw = json.kp_rating || (json.votes ? json.votes.kp : 0) || (movie.votes ? movie.votes.kp : 0) || movie.kp_rating || 0;
-                        
-                        if (Lampa.Storage.field('show_kp_rating') && kp_raw > 0) {
-                            var kp_val = parseFloat(kp_raw).toFixed(1);
-                            rateLine.prepend('<div class="full-start__rate custom-rate rate--kp"><div>' + kp_val + '</div>' + icons.kp + '</div>');
-                        }
-
-                        // --- ПОИСК РЕЙТИНГА IMDB ---
-                        var imdb_raw = json.imdb_rating || (json.votes ? json.votes.imdb : 0) || (movie.votes ? movie.votes.imdb : 0) || json.vote_average || 0;
-                        
-                        if (Lampa.Storage.field('show_imdb_rating') && imdb_raw > 0) {
+                network.silent(tmdb_url, function (tmdb_data) {
+                    
+                    // Блок: Отрисовка IMDB (из данных TMDB)
+                    if (Lampa.Storage.field('show_imdb_rating')) {
+                        var imdb_raw = tmdb_data.imdb_rating || (tmdb_data.votes ? tmdb_data.votes.imdb : 0) || tmdb_data.vote_average || 0;
+                        if (imdb_raw > 0) {
                             var imdb_val = parseFloat(imdb_raw).toFixed(1);
-                            var imdbItem = $('<div class="full-start__rate custom-rate rate--imdb"><div>' + imdb_val + '</div>' + icons.imdb + '</div>');
-                            
-                            var tmdb = rateLine.find('.rate--tmdb');
-                            if (tmdb.length) tmdb.after(imdbItem);
-                            else rateLine.append(imdbItem);
+                            var imdb_html = $('<div class="full-start__rate custom-rate rate--imdb-text"><div>' + imdb_val + '</div><div class="source-label">IMDB</div></div>');
+                            var tmdb_block = rateLine.find('.rate--tmdb');
+                            if (tmdb_block.length) tmdb_block.after(imdb_html);
+                            else rateLine.append(imdb_html);
+                        }
+                    }
+
+                    // --- ШАГ 2: Запрос к Kinopoisk Unofficial (только если есть ключ) ---
+                    if (kp_key && kp_key.trim().length > 0) {
+                        
+                        // Пытаемся найти KP ID (в Lampa он часто сидит в movie.id, если источник KP, или в external_ids)
+                        var kp_id = (tmdb_data.external_ids ? tmdb_data.external_ids.kp_id : null) || movie.id;
+
+                        // Если ID похож на правду (числовой), делаем запрос
+                        if (kp_id && !isNaN(kp_id)) {
+                            $.ajax({
+                                url: 'https://kinopoiskapiunofficial.tech/api/v2.2/films/' + kp_id,
+                                method: 'GET',
+                                headers: {
+                                    'X-API-KEY': kp_key.trim(),
+                                    'Content-Type': 'application/json',
+                                },
+                                success: function (kp_data) {
+                                    if (kp_data.ratingKinopoisk) {
+                                        var kp_val = parseFloat(kp_data.ratingKinopoisk).toFixed(1);
+                                        var kp_html = '<div class="full-start__rate custom-rate rate--kp-text"><div>' + kp_val + '</div><div class="source-label">KP</div></div>';
+                                        rateLine.prepend(kp_html);
+                                    }
+                                }
+                            });
                         }
                     }
                 });
@@ -80,6 +98,7 @@
         });
     }
 
+    // --- ЗАПУСК ---
     if (window.appready) initRatings();
     else {
         Lampa.Listener.follow('app', function (e) {
