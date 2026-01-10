@@ -42,19 +42,22 @@
             icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
         });
 
+        Lampa.Params.select('kp_unofficial_token','','')  
+        
         // Твой код для addParam
         Lampa.SettingsApi.addParam({
             component: 'ratings_tweaks',
             param: {
                 name: 'kp_unofficial_token',
                 type: 'input',
-                default: `test`, // Поставил рабочий как дефолт
+                default: ``, // Поставил рабочий как дефолт
                 placeholder: 'Введите ключ...'
             },
             field: {
                 name: 'API ключ Кинопоиск',
                 descr: 'Используется ключ от kinopoiskapiunofficial.tech'
             },
+            //defaults: ['kp_unofficial_token'],
             onChange: function (value) {
                 // Валидация формата UUID
                 if (value && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
