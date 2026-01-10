@@ -33,8 +33,8 @@
 
     // Официальные PNG иконки
     var png_icons = {
-        kp: 'https://raw.githubusercontent.com/nb557/plugins/master/rating/img/kp.png',
-        imdb: 'https://raw.githubusercontent.com/nb557/plugins/master/rating/img/imdb.png'
+        kp: 'https://logo-teka.com/wp-content/uploads/2025/07/kinopoisk-sign-logo.svg',
+        imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg'
     };
 
     /**
