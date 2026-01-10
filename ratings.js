@@ -33,7 +33,7 @@
 
     /**
      * ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ЧЕРЕЗ СТАНДАРТНОЕ API
-     */
+     
     function setupSettings() {
         Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');
         
@@ -66,7 +66,26 @@
             }
         });
     }
-
+*/
+function setupSettings() {  
+    Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');  
+      
+    Lampa.Template.add('settings_ratings_tweaks', `<div>  
+        <div class="settings-param selector" data-name="kp_unofficial_token" data-type="input" placeholder="Введите ключ...">  
+            <div class="settings-param__name">API ключ Кинопоиск</div>  
+            <div class="settings-param__value"></div>  
+            <div class="settings-param__descr">Используется ключ от kinopoiskapiunofficial.tech</div>  
+        </div>  
+    </div>`);  
+      
+    Lampa.SettingsApi.addComponent({  
+        component: 'ratings_tweaks',  
+        name: 'Рейтинги',  
+        icon: '<svg>...</svg>',  
+        template: 'settings_ratings_tweaks'  
+    });  
+}
+    
     /**
      * ЛОГИКА ОТОБРАЖЕНИЯ
      */
