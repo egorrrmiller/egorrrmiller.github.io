@@ -70,7 +70,11 @@
      */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
-        var kp_token = Lampa.Storage.get('kp_unofficial_token');
+        var kp_token = Lampa.Storage.field('kp_unofficial_token');  
+        if (kp_token === undefined || kp_token === null) {  
+            kp_token = '24b4fca8-ab26-4c97-a675-f46012545706';  
+        }  
+        
         var clean_title = card.title.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
         
         var params = {
