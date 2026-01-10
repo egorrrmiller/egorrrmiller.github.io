@@ -30,7 +30,7 @@
             Controller._mousePatchApplied = true;
             const orig = Controller.move;
             Controller.move = function (dir) {
-                if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') return;
+                if (dir === 'left' || dir === 'right') return;
                 return orig.apply(this, arguments);
             };
         }
