@@ -13,32 +13,35 @@
             .full-start__rate { 
                 display: inline-flex !important; 
                 align-items: center !important; 
-                gap: 8px !important; 
-                margin-right: 15px !important;
+                gap: 9px !important; 
+                margin-right: 18px !important;
                 font-weight: bold !important;
-                font-size: 1.1em !important;
+                /* Увеличено на 15% (было 1.1em -> стало 1.25em) */
+                font-size: 1.25em !important;
             }
             .rate--kp { color: #ff9000 !important; }
             .rate--imdb { color: #f5c518 !important; }
             .rate--tmdb { color: #01b4e4 !important; }
 
             .rate-png-icon {
-                width: 1.4em;
-                height: 1.4em;
+                /* Увеличено на 15% (было 1.4em -> стало 1.6em) */
+                width: 1.6em;
+                height: 1.6em;
                 object-fit: contain;
                 flex-shrink: 0;
             }
         </style>`);
     }
 
-    // Официальные PNG иконки
+    // Ссылки на иконки
     var png_icons = {
         kp: 'https://logo-teka.com/wp-content/uploads/2025/07/kinopoisk-sign-logo.svg',
-        imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg'
+        imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg',
+        tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg'
     };
 
     /**
-     * МЕНЮ НАСТРОЕК (Исправлено по документации)
+     * МЕНЮ НАСТРОЕК
      */
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
@@ -89,7 +92,7 @@
     });
 
     /**
-     * ОСНОВНАЯ ЛОГИКА (Твой рабочий код)
+     * ОСНОВНАЯ ЛОГИКА
      */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
@@ -103,13 +106,18 @@
             cache_time: 86400000 
         };
 
-        // Поиск фильма
+        // Сразу обновляем TMDB (он есть в данных Lampa)
+        if (card.vote_average) {
+            var tmdb_html = $(`<div class="full-start__rate rate--tmdb"><img src="${png_icons.tmdb}" class="rate-png-icon"><div>${parseFloat(card.vote_average).toFixed(1)}</div></div>`);
+            Lampa.Activity.active().activity.render().find('.rate--tmdb').replaceWith(tmdb_html);
+        }
+
+        // Поиск в Кинопоиске
         var search_url = params.url + 'api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(clean_title);
         network.silent(search_url, function (json) {
             var items = json.films || json.items || [];
             if (items.length) {
                 var id = items[0].filmId || items[0].kinopoiskId;
-                // Получение деталей (рейтингов)
                 network.silent(params.url + 'api/v2.2/films/' + id, function (data) {
                     _showRating(data.ratingKinopoisk, data.ratingImdb);
                 }, function(){}, false, { headers: params.headers });
