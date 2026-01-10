@@ -48,7 +48,7 @@
             param: {
                 name: 'kp_unofficial_token',
                 type: 'input',
-                default: true, // Поставил рабочий как дефолт
+                default: `test`, // Поставил рабочий как дефолт
                 placeholder: 'Введите ключ...'
             },
             field: {
