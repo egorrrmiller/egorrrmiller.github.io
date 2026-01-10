@@ -1,75 +1,73 @@
 (function () {
     'use strict';
 
-    // Регистрируем раздел в настройках для управления плагином
+    // Регистрация раздела в настройках
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
         icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
     });
 
-    // Параметр: Показывать Кинопоиск
+    // Параметр: Кинопоиск
     Lampa.SettingsApi.addParam({
         component: 'ratings_tweaks',
         param: { name: 'show_kp_rating', type: 'trigger', default: true },
-        field: { name: 'Рейтинг Кинопоиск', description: 'Отображать KP в карточках и описании' }
+        field: { name: 'Рейтинг Кинопоиск', description: 'Отображать KP в карточке' }
     });
 
-    // Параметр: Показывать TMDB
+    // Параметр: IMDB
     Lampa.SettingsApi.addParam({
         component: 'ratings_tweaks',
-        param: { name: 'show_tmdb_rating', type: 'trigger', default: true },
-        field: { name: 'Рейтинг TMDB', description: 'Отображать TMDB в карточках и описании' }
+        param: { name: 'show_imdb_rating', type: 'trigger', default: true },
+        field: { name: 'Рейтинг IMDB', description: 'Отображать IMDB в карточке' }
     });
 
-    // --- ЛОГИКА ОТОБРАЖЕНИЯ ---
-
     function initRatings() {
-        
-        // Блок: Обработка карточек в списках
+        // Добавляем стили для красоты
+        var style = $('<style>' +
+            '.full-start__rate.rate--kp { color: #ff9000; font-weight: bold; }' +
+            '.full-start__rate.rate--imdb { color: #f5c518; font-weight: bold; }' +
+            '.full-start__rate div:first-child { font-size: 1.2em; }' +
+            '.full-start-new__rate-line { align-items: center; display: flex; }' +
+            '</style>');
+        $('body').append(style);
+
+        // Следим за открытием страницы фильма
         Lampa.Listener.follow('full', function (e) {
             if (e.type == 'complite') {
-                renderRatings(e);
+                var container = e.body;
+                var data = e.data.movie;
+
+                // Блок: Поиск строки с рейтингами
+                var rateLine = container.find('.full-start-new__rate-line');
+
+                if (rateLine.length) {
+                    // Блок: Обработка Кинопоиска
+                    if (Lampa.Storage.field('show_kp_rating') && data.kp_rating) {
+                        var kpBlock = rateLine.find('.rate--kp');
+                        if (kpBlock.length) {
+                            kpBlock.find('div:first-child').text(data.kp_rating);
+                        } else {
+                            rateLine.prepend('<div class="full-start__rate rate--kp"><div>' + data.kp_rating + '</div><div class="source--name">KP</div></div>');
+                        }
+                    }
+
+                    // Блок: Обработка IMDB
+                    if (Lampa.Storage.field('show_imdb_rating') && data.imdb_rating) {
+                        var imdbBlock = rateLine.find('.rate--imdb');
+                        if (imdbBlock.length) {
+                            imdbBlock.find('div:first-child').text(data.imdb_rating);
+                        } else {
+                            // Вставляем после TMDB или просто в начало
+                            rateLine.find('.rate--tmdb').after('<div class="full-start__rate rate--imdb"><div>' + data.imdb_rating + '</div><div class="source--name">IMDB</div></div>');
+                        }
+                    }
+                }
             }
         });
-
-        // Блок: Функция рендеринга данных
-        function renderRatings(e) {
-            var card = e.object;
-            var container = e.body;
-            
-            // Получаем данные из API (используем штатный прокси Lampa для рейтингов)
-            if (card.method !== 'person') {
-                var url = 'https://api.tmdb.org/3/' + card.method + '/' + card.id + '?api_key=4ef0d3844422e11e86053351ec3c6902&language=ru-RU';
-                
-                // Для Кинопоиска в Lampa обычно используется отдельный парсер или готовые поля в e.data
-                // Если данные доступны в e.data (после загрузки страницы фильма)
-                if (e.data && e.data.movie) {
-                    displayOnFullPage(e.data.movie, container);
-                }
-            }
-        }
-
-        // Блок: Отображение на странице фильма (описание)
-        function displayOnFullPage(data, container) {
-            var info = container.find('.full-start__details');
-            if (info.length && !info.find('.custom-ratings').length) {
-                var html = $('<div class="custom-ratings" style="display: flex; gap: 15px; margin-top: 10px; font-weight: bold;"></div>');
-                
-                if (Lampa.Storage.field('show_kp_rating') && data.kp_rating) {
-                    html.append('<span style="color: #ff9000;">KP: ' + data.kp_rating + '</span>');
-                }
-                
-                if (Lampa.Storage.field('show_tmdb_rating') && data.vote_average) {
-                    html.append('<span style="color: #01d277;">TMDB: ' + data.vote_average + '</span>');
-                }
-                
-                info.append(html);
-            }
-        }
     }
 
-    // Инициализация
+    // Запуск
     if (window.appready) initRatings();
     else {
         Lampa.Listener.follow('app', function (e) {
