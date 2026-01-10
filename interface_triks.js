@@ -7,9 +7,12 @@
 
         // 1. Функция фиксации мыши
         var fixMouseLogic = function() {
+            // Блокируем стандартную реакцию Lampa (прыжки по элементам)
             window.addEventListener('wheel', function(e) {
-                // Просто даем браузеру крутить нативно
-            }, {passive: true});
+                if (Lampa.Storage.get('navigation_type') === 'mouse') {
+                    e.stopImmediatePropagation();
+                }
+            }, true); // true обязателен для перехвата до того, как Lampa его обработает
 
             var styles = `
                 .scroll--mask, .items-line__body, .category-full__body, .full-start__body, .settings-list, .layer--full {
@@ -29,7 +32,7 @@
             }
         };
 
-        // 2. Создание меню выбора (если еще не выбрано)
+        // 2. Создание меню выбора
         var showChoice = function() {
             var is_done = Lampa.Storage.get("weapon_choised");
             if (is_done === "true" || is_done === true) return;
