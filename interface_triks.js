@@ -2,23 +2,17 @@
     'use strict';
 
     function startSwitchMouse() {
+        if (window.switch_mouse) return; // Защита от повторного запуска скрипта
         window.switch_mouse = true;
 
-        // 1. Вывод системной информации через Lampa.Platform
-        console.log('--- LAMPA SYSTEM DEBUG ---');
+        // 1. Определение платформы через Lampa.Platform
+        var platform = 'browser';
         if (typeof Lampa !== 'undefined' && Lampa.Platform) {
-            console.log('Platform Type:', Lampa.Platform.type());
-            console.log('Platform Screen:', window.innerWidth + 'x' + window.innerHeight);
-            // Проверка всех ключевых статусов
-            ['android', 'tizen', 'webos', 'browser', 'apple'].forEach(p => {
-                if(Lampa.Platform.is(p)) console.log('Current Lampa.Platform.is("' + p + '"): true');
-            });
+            platform = Lampa.Platform.type() || 'browser';
+            console.log('MOUSE PLUGIN: Platform detected as', platform);
         }
-        console.log('Storage Navigation:', Lampa.Storage.get('navigation_type'));
-        console.log('Storage Mobile Mode:', Lampa.Storage.get('is_true_mobile'));
-        console.log('--------------------------');
 
-        // 2. Функция фиксации мыши и нативного скролла
+        // 2. Функция фиксации мыши
         var fixMouseLogic = function() {
             window.addEventListener('wheel', function(e) {
                 if (Lampa.Storage.get('navigation_type') === 'mouse') {
@@ -27,51 +21,41 @@
             }, {passive: true, capture: true});
 
             var styles = `
-                .scroll--mask, .items-line__body, .category-full__body, .full-start__body, .settings-list, .layer--full, .scroll__body {
+                .scroll--mask, .items-line__body, .category-full__body, .full-start__body, .settings-list, .layer--full {
                     overflow-y: auto !important;
                     overflow-x: hidden !important;
-                    pointer-events: all !important;
                     -webkit-overflow-scrolling: touch !important;
                 }
-                .scroll--mask::-webkit-scrollbar { display: none; }
-                .scroll--over { pointer-events: none !important; }
-                .scroll--over > * { pointer-events: all !important; }
-                .scroll__scrollbar { display: none !important; }
-                
-                /* Форсируем отображение десктопных элементов, если Lampa капризничает */
-                body.is--mouse .head__menu-button { display: none !important; } /* Прячем "гамбургер", если он вылез */
+                .scroll--mask::-webkit-scrollbar, .items-line__body::-webkit-scrollbar {
+                    display: none;
+                    width: 0;
+                }
+                .scroll--over { pointer-events: all !important; }
             `;
             
             $('<style id="lampa-mouse-fix">').text(styles).appendTo('head');
         };
 
-        // 3. Меню выбора
+        // 3. Создание меню выбора (ИСПРАВЛЕНО)
         var showChoice = function() {
-            var choised = Lampa.Storage.get("weapon_choised");
-            if (choised === true || choised === "true") return;
+            // Проверка: если уже выбрано, выходим
+            var is_choised = Lampa.Storage.get("weapon_choised");
+            if (is_choised === "true" || is_choised === true) return;
 
             let html = Lampa.Template.get('lang_choice', {});
             let scroll = new Lampa.Scroll({ mask: true, over: true });
 
             let setMode = function(nav, mobile) {
-                // Принудительно чистим старые значения, чтобы избежать кэширования режима
                 Lampa.Storage.set("navigation_type", nav);
                 Lampa.Storage.set("is_true_mobile", mobile);
-                Lampa.Storage.set("weapon_choised", "true");
-                
-                // Дополнительный фикс: Lampa иногда хранит 'true' как строку, что сбивает логику
-                if (mobile === "false") {
-                   localStorage.setItem('is_true_mobile', 'false');
-                }
-
-                Lampa.Noty.show('Применяем режим: ' + nav);
-                setTimeout(() => { window.location.reload(); }, 200);
+                Lampa.Storage.set("weapon_choised", true); // Сохраняем как boolean для надежности
+                window.location.reload();
             };
 
             let btns = [
                 { name: "Пульт (Классика)", action: () => setMode("controller", "false") },
-                { name: "Мышь (Десктопный вид)", action: () => setMode("mouse", "false") },
-                { name: "Тачскрин (Мобильный вид)", action: () => setMode("controller", "true") }
+                { name: "Мышь / AirMouse", action: () => setMode("mouse", "false") }, // Ставим false, чтобы не был мобильный вид
+                { name: "Тачскрин / Смартфон", action: () => setMode("controller", "true") }
             ];
 
             btns.forEach(b => {
@@ -83,9 +67,7 @@
                 scroll.append(item);
             });
 
-            // Показываем тип платформы в самом окне
-            var platformInfo = (typeof Lampa !== 'undefined') ? Lampa.Platform.type() : 'unknown';
-            html.find('.lang__info').text('Платформа: ' + platformInfo.toUpperCase());
+            html.find('.lang__info').text('Платформа: ' + platform.toUpperCase());
             html.find('.lang__selector').empty().append(scroll.render());
             $('body').append(html);
 
@@ -93,23 +75,37 @@
                 toggle: () => {
                     Lampa.Controller.collectionSet(scroll.render());
                     Lampa.Controller.collectionFocus(false, scroll.render());
-                }
+                },
+                up: () => Lampa.Navigator.move('up'),
+                down: () => Lampa.Navigator.move('down')
             });
             Lampa.Controller.toggle('select_weapon');
         };
 
-        // 4. Настройки
+        // 4. Регистрация в настройках
         var addToSettings = function() {
+            if ($('.weapon_choised_reset').length) return; // Не добавлять дважды
+
             Lampa.SettingsApi.addParam({
                 component: 'more',
-                param: { name: 'weapon_choised_reset', type: 'static', default: false },
-                field: { name: 'Тип управления', description: 'Сбросить выбор и перенастроить UI' },
+                param: {
+                    name: 'weapon_choised_reset',
+                    type: 'static',
+                    default: false
+                },
+                field: {
+                    name: 'Тип управления',
+                    description: 'Текущий режим: ' + (Lampa.Storage.get('navigation_type') === 'mouse' ? 'МЫШЬ' : 'ПУЛЬТ')
+                },
                 onRender: function(item) {
+                    item.addClass('weapon_choised_reset');
                     item.find('.settings-param__value').text('Сбросить');
+                    
                     item.on('hover:enter click', function(e) {
                         if (e.type === 'click' && !Lampa.DeviceInput.canClick(e.originalEvent)) return;
-                        Lampa.Storage.set('weapon_choised', "false");
-                        window.location.reload();
+                        Lampa.Storage.set('weapon_choised', false);
+                        Lampa.Noty.show('Настройки сброшены. Перезагрузка...');
+                        setTimeout(() => { window.location.reload(); }, 1000);
                     });
                 }
             });
@@ -120,18 +116,17 @@
             }
         };
 
-        if (window.appready) {
+        // Корректный запуск
+        var init = function() {
             showChoice();
             addToSettings();
-        } else {
-            Lampa.Listener.follow('app', function (e) {
-                if (e.type == "ready") {
-                    showChoice();
-                    addToSettings();
-                }
-            });
-        }
+        };
+
+        if (window.appready) init();
+        else Lampa.Listener.follow('app', function (e) {
+            if (e.type == "ready") init();
+        });
     }
 
-    if (!window.switch_mouse) startSwitchMouse();
+    startSwitchMouse();
 })();
