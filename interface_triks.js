@@ -5,6 +5,13 @@
         if (window.switch_mouse_init) return;
         window.switch_mouse_init = true;
 
+        // 1. Определение платформы через системный метод Lampa
+        var platform = 'browser';
+        if (typeof Lampa !== 'undefined' && Lampa.Platform) {
+            platform = Lampa.Platform.type() || 'browser';
+        }
+
+        // 2. Функция фиксации мыши
         var fixMouseLogic = function() {
             window.addEventListener('wheel', function(e) {
                 if (Lampa.Storage.get('navigation_type') === 'mouse') {
@@ -24,14 +31,62 @@
                 }
                 .scroll--over { pointer-events: all !important; }
             `;
-            $('<style>').text(styles).appendTo('head');
+            
+            $('<style id="lampa-mouse-fix">').text(styles).appendTo('head');
         };
 
+        // 3. Создание меню выбора
+        var showChoice = function() {
+            // Исправленная проверка флага (теперь работает и со строкой, и с булевым значением)
+            var choised = Lampa.Storage.get("weapon_choised");
+            if (choised === "true" || choised === true) return;
+
+            let html = Lampa.Template.get('lang_choice', {});
+            let scroll = new Lampa.Scroll({ mask: true, over: true });
+
+            let setMode = function(nav, mobile) {
+                Lampa.Storage.set("navigation_type", nav);
+                Lampa.Storage.set("is_true_mobile", mobile);
+                Lampa.Storage.set("weapon_choised", "true");
+                window.location.reload();
+            };
+
+            let btns = [
+                { name: "Пульт (Классика)", action: () => setMode("controller", false) },
+                { name: "Мышь / AirMouse", action: () => setMode("mouse", false) }, // mobile: false решает проблему мобильного вида
+                { name: "Тачскрин / Смартфон", action: () => setMode("controller", true) }
+            ];
+
+            btns.forEach(b => {
+                let item = $('<div class="selector lang__selector-item">' + b.name + '</div>');
+                item.on('hover:enter click', (e) => {
+                    if (e.type === 'click' && !Lampa.DeviceInput.canClick(e.originalEvent)) return;
+                    b.action();
+                });
+                scroll.append(item);
+            });
+
+            html.find('.lang__info').text('Платформа: ' + platform.toUpperCase());
+            html.find('.lang__selector').empty().append(scroll.render());
+            $('body').append(html);
+
+            Lampa.Controller.add('select_weapon', {
+                toggle: () => {
+                    Lampa.Controller.collectionSet(scroll.render());
+                    Lampa.Controller.collectionFocus(false, scroll.render());
+                },
+                up: () => Lampa.Navigator.move('up'),
+                down: () => Lampa.Navigator.move('down')
+            });
+            Lampa.Controller.toggle('select_weapon');
+        };
+
+        // 4. Регистрация в настройках
         var addToSettings = function() {
             Lampa.SettingsApi.addParam({
                 component: 'more',
                 param: {
-                    name: 'navigation_type_toggle',
+                    name: 'weapon_choised_reset',
                     type: 'static',
                     default: false
                 },
@@ -40,34 +95,34 @@
                     description: 'Текущий: ' + (Lampa.Storage.get('navigation_type') === 'mouse' ? 'МЫШЬ' : 'ПУЛЬТ')
                 },
                 onRender: function(item) {
-                    item.find('.settings-param__value').text('Изменить');
+                    item.find('.settings-param__value').text('Сбросить');
+                    
                     item.on('hover:enter click', function(e) {
                         if (e.type === 'click' && !Lampa.DeviceInput.canClick(e.originalEvent)) return;
-                        
-                        let current = Lampa.Storage.get('navigation_type');
-                        if (current === 'mouse') {
-                            Lampa.Storage.set('navigation_type', 'controller');
-                            Lampa.Storage.set('is_true_mobile', false);
-                        } else {
-                            Lampa.Storage.set('navigation_type', 'mouse');
-                            Lampa.Storage.set('is_true_mobile', false);
-                        }
-                        window.location.reload();
+                        Lampa.Storage.set('weapon_choised', "false");
+                        Lampa.Noty.show('Настройки сброшены. Перезагрузка...');
+                        setTimeout(() => { window.location.reload(); }, 1000);
                     });
                 }
             });
 
             if (Lampa.Storage.get('navigation_type') === 'mouse') {
                 fixMouseLogic();
-                Lampa.Storage.set('is_true_mobile', false);
-                $('body').addClass('is--mouse').removeClass('true--mobile');
+                $('body').addClass('is--mouse');
             }
         };
 
-        if (window.appready) addToSettings();
-        else Lampa.Listener.follow('app', function (e) {
-            if (e.type == "ready") addToSettings();
-        });
+        if (window.appready) {
+            showChoice();
+            addToSettings();
+        } else {
+            Lampa.Listener.follow('app', function (e) {
+                if (e.type == "ready") {
+                    showChoice();
+                    addToSettings();
+                }
+            });
+        }
     }
 
     startSwitchMouse();
