@@ -1,103 +1,166 @@
 (function () {
     'use strict';
 
-    function init() {
-        // --- 1. ПАРАМЕТРЫ (Хранятся в Lampa) ---
-        Lampa.SettingsApi.addParam({
-            component: 'panel_settings',
-            param: { name: 'head_reboot', type: 'trigger', default: true },
-            field: { name: 'Кнопка перезагрузки', description: 'Показать иконку обновления страницы' },
-            onChange: updatePanel
-        });
+    // 1. Настройки плагина и параметры
+    // Мы используем тот же метод addParam, что и в tricks.js
+    Lampa.SettingsApi.addParam({
+        component: 'extended_header',
+        param: {
+            name: 'header_reboot_btn',
+            type: 'trigger',
+            default: true
+        },
+        field: {
+            name: 'Кнопка перезагрузки',
+            description: 'Отображать кнопку обновления страницы'
+        },
+        onChange: function (value) {
+            updateHeader();
+        }
+    });
 
-        Lampa.SettingsApi.addParam({
-            component: 'panel_settings',
-            param: { name: 'head_notifications', type: 'trigger', default: true },
-            field: { name: 'Уведомления', description: 'Показать стандартный колокольчик' },
-            onChange: updatePanel
-        });
+    Lampa.SettingsApi.addParam({
+        component: 'extended_header',
+        param: {
+            name: 'header_native_notify',
+            type: 'trigger',
+            default: true
+        },
+        field: {
+            name: 'Уведомления',
+            description: 'Стандартный колокольчик'
+        },
+        onChange: function (value) {
+            updateHeader();
+        }
+    });
 
-        Lampa.SettingsApi.addParam({
-            component: 'panel_settings',
-            param: { name: 'head_profile', type: 'trigger', default: true },
-            field: { name: 'Профиль', description: 'Показать иконку пользователя' },
-            onChange: updatePanel
-        });
+    Lampa.SettingsApi.addParam({
+        component: 'extended_header',
+        param: {
+            name: 'header_native_profile',
+            type: 'trigger',
+            default: true
+        },
+        field: {
+            name: 'Профиль',
+            description: 'Иконка входа в профиль'
+        },
+        onChange: function (value) {
+            updateHeader();
+        }
+    });
 
-        // --- 2. ЛОГИКА ПАНЕЛИ ---
-        function updatePanel() {
-            // Управление кнопкой перезагрузки
-            if (Lampa.Storage.field('head_reboot')) {
-                if (!$('#RELOAD_BUTTON').length) {
-                    var btn = $('<div id="RELOAD_BUTTON" class="head__action selector"><svg fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width:1.8em; height:1.8em;"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg></div>');
-                    $('#app .head__actions').append(btn);
-                    btn.on('hover:enter click', function() { location.reload(); });
-                }
-                $('#RELOAD_BUTTON').removeClass('hide');
-            } else {
-                $('#RELOAD_BUTTON').addClass('hide');
-            }
-
-            // Управление штатными кнопками
-            if (Lampa.Storage.field('head_notifications')) $('.head__action--notifications').removeClass('hide');
-            else $('.head__action--notifications').addClass('hide');
-
-            if (Lampa.Storage.field('head_profile')) $('.head__action--profile').removeClass('hide');
-            else $('.head__action--profile').addClass('hide');
-
-            if (window.Lampa && Lampa.Head) Lampa.Head.update();
+    // 2. Основная функция обновления шапки
+    // Вызывается при старте и при каждом изменении настроек
+    function updateHeader() {
+        // --- КНОПКА ПЕРЕЗАГРУЗКИ ---
+        var reboot_btn = $('#header_reboot_btn');
+        
+        // Если кнопки нет в DOM, создаем её
+        if (!reboot_btn.length) {
+            var html = '<div id="header_reboot_btn" class="head__action selector">' +
+                '<svg fill="#fff" width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,23A11,11,0,1,0,1,12,11.013,11.013,0,0,0,12,23ZM12,3a9,9,0,1,1-9,9A9.01,9.01,0,0,1,12,3ZM8.293,14.293,10.586,12,8.293,9.707A1,1,0,0,1,9.707,8.293L12,10.586l2.293-2.293a1,1,0,0,1,1.414,1.414L13.414,12l2.293,2.293a1,1,0,1,1-1.414,1.414L12,13.414,9.707,15.707a1,1,0,0,1-1.414-1.414Z" fill="currentColor"/></svg>' +
+                '</div>';
+            
+            // Вставляем в шапку (селектор из tricks.js)
+            $('.head .head__actions').append(html);
+            
+            reboot_btn = $('#header_reboot_btn');
+            
+            // Вешаем событие
+            reboot_btn.on('hover:enter click', function () {
+                window.location.reload();
+            });
         }
 
-        // --- 3. ВНЕДРЕНИЕ В НАСТРОЙКИ (СТИЛЬ TRICKS) ---
+        // Проверяем настройку и скрываем/показываем (используем Lampa.Storage.field как в tricks)
+        if (Lampa.Storage.field('header_reboot_btn')) {
+            reboot_btn.removeClass('hide');
+        } else {
+            reboot_btn.addClass('hide');
+        }
+
+        // --- РОДНЫЕ КНОПКИ ---
+        var notify = $('.head__action.head__action--notifications');
+        var profile = $('.head__action.head__action--profile');
+
+        if (Lampa.Storage.field('header_native_notify')) notify.removeClass('hide');
+        else notify.addClass('hide');
+
+        if (Lampa.Storage.field('header_native_profile')) profile.removeClass('hide');
+        else profile.addClass('hide');
+        
+        // Обновляем навигацию пульта
+        if(window.Lampa && Lampa.Head) Lampa.Head.update();
+    }
+
+    // 3. Внедрение пункта в меню настроек
+    // Точная копия логики слушателя из tricks.js
+    function startPlugin() {
+        // Запускаем применение настроек сразу
+        updateHeader();
+
         Lampa.Settings.listener.follow('open', function (e) {
+            // Проверяем, что открыто главное меню настроек
             if (e.name == 'main') {
-                // Используем setTimeout, чтобы Lampa не затерла наш пункт при отрисовке
-                setTimeout(function () {
-                    var scroll = e.body.find('.scroll');
-                    if (scroll.length && !scroll.find('[data-component="panel_settings"]').length) {
-                        var item = $('<div class="settings-folder selector" data-component="panel_settings">' +
-                            '<div class="settings-folder__icon"><svg height="24" viewBox="0 0 24 24" width="24" xmlns="http://www.w3.org/2000/svg" fill="currentColor"><path d="M0 0h24v24H0V0z" fill="none"/><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg></div>' +
-                            '<div class="settings-folder__name">Верхняя панель</div>' +
-                        '</div>');
+                // Создаем элемент меню
+                var item = $(
+                    '<div class="settings-folder selector" data-component="extended_header">' +
+                        '<div class="settings-folder__icon">' +
+                            '<svg width="24px" height="24px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" fill="#fff"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"/></svg>' +
+                        '</div>' +
+                        '<div class="settings-folder__name">Верхняя панель</div>' +
+                    '</div>'
+                );
 
-                        item.on('hover:enter', function () {
-                            // Отрисовка подменю (метод прямой подмены)
-                            var list = Lampa.SettingsApi.render({ component: 'panel_settings' });
-                            
-                            // Сохраняем оригинальный контент, чтобы вернуться (эмуляция кнопки назад)
-                            var original = scroll.find('.scroll__content').children();
-                            scroll.find('.scroll__content').empty().append(list);
+                // Обработка нажатия на пункт
+                item.on('hover:enter', function () {
+                    // 1. Очищаем текущий список настроек
+                    var scroll = Lampa.Settings.main().render().find('.scroll');
+                    
+                    // 2. Рендерим наши параметры (component: 'extended_header')
+                    var params_list = Lampa.SettingsApi.render({
+                        component: 'extended_header'
+                    });
 
-                            // Добавляем обработку пульта для подменю
-                            Lampa.Controller.add('panel_settings_list', {
-                                toggle: function () {
-                                    Lampa.Controller.collectionSet(list);
-                                    Lampa.Controller.follow('panel_settings_list');
-                                },
-                                up: Lampa.Navigator.move.bind(Lampa.Navigator, 'up'),
-                                down: Lampa.Navigator.move.bind(Lampa.Navigator, 'down'),
-                                back: function () {
-                                    scroll.find('.scroll__content').empty().append(original);
-                                    Lampa.Controller.toggle('settings'); // Возврат к основному контроллеру настроек
-                                }
-                            });
-                            Lampa.Controller.toggle('panel_settings_list');
-                        });
+                    // 3. Сохраняем текущее состояние для возврата (логика tricks)
+                    // (Здесь упрощено: просто заменяем контент)
+                    scroll.find('.scroll__content').empty().append(params_list);
 
-                        scroll.append(item);
-                    }
-                }, 10);
+                    // 4. Переключаем контроллер пульта на новые кнопки
+                    Lampa.Controller.add('extended_header_controller', {
+                        toggle: function () {
+                            Lampa.Controller.collectionSet(scroll);
+                            Lampa.Controller.follow('extended_header_controller');
+                        },
+                        up: function () {
+                            Lampa.Navigator.move('up');
+                        },
+                        down: function () {
+                            Lampa.Navigator.move('down');
+                        },
+                        back: function () {
+                            // При нажатии назад - перерисовываем главное меню
+                            Lampa.Settings.main().render();
+                        }
+                    });
+
+                    Lampa.Controller.toggle('extended_header_controller');
+                });
+
+                // Добавляем пункт в конец списка
+                e.body.find('.scroll').append(item);
             }
         });
-
-        updatePanel();
     }
 
-    // Старт
-    if (window.appready) init();
+    // Инициализация (стандартная для Lampa)
+    if (window.appready) startPlugin();
     else {
         Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') init();
+            if (e.type == 'ready') startPlugin();
         });
     }
+
 })();
