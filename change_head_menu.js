@@ -58,7 +58,7 @@
                     '</g></svg>' +
                     '</div>';
                 
-                $('.head .head__actions').prepend(html);
+                $('.head .head__actions').append(html);
                 
                 reboot_btn = $('#custom_reboot_icon');
                 reboot_btn.on('hover:enter click', function () { 
