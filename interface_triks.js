@@ -1,6 +1,7 @@
 (function () {
     'use strict';
 
+    // Регистрируем параметр в разделе "Интерфейс"
     Lampa.SettingsApi.addParam({
         component: 'interface',
         param: {
@@ -10,7 +11,7 @@
         },
         field: {
             name: 'Точный масштаб',
-            description: 'Безопасное изменение размера (через CSS)'
+            description: 'Безопасное изменение размера элементов'
         },
         onRender: function (item) {
             var current = Lampa.Storage.field('ui_custom_zoom_fine') || '100';
@@ -37,7 +38,7 @@
                         item.find('.settings-param__value').text(a.value + '%');
                         applyZoom(a.value);
                         
-                        // Даем контроллеру Lampa время осознать изменения
+                        // Возврат фокуса с задержкой для пересчета координат
                         setTimeout(function(){
                             Lampa.Controller.toggle('settings_interface');
                         }, 200);
@@ -49,34 +50,27 @@
 
     function applyZoom(value) {
         var zoomValue = value || Lampa.Storage.field('ui_custom_zoom_fine') || '100';
-        
-        // Удаляем предыдущий стиль
-        $('#lampa-custom-zoom-css').remove();
+        var ratio = parseInt(zoomValue) / 100;
 
-        // Рассчитываем множитель. 
-        // Lampa обычно ставит 10px или 16px на html. 
-        // Мы будем использовать vh/vw или проценты, которые не ломают расчеты координат.
-        var style = $('<style id="lampa-custom-zoom-css">' +
+        $('#lampa-custom-zoom-fine').remove();
+
+        // Мы воздействуем на переменную --ms, которую Lampa использует для масштабирования.
+        // Это заставляет приложение пересчитать и визуал, и сетку навигации.
+        var style = $('<style id="lampa-custom-zoom-fine">' +
             ':root {' +
-                '--ui-zoom: ' + (parseInt(zoomValue) / 100) + ';' +
-            '}' +
-            'html {' +
-                // Используем вычисление, которое Lampa подхватит в своих скриптах
-                'font-size: calc(' + zoomValue + '% * (100vw / 1280)) !important;' +
-            '}' +
-            // Адаптация для разных разрешений экрана (ТВ стандарт)
-            '@media screen and (min-width: 1920px) {' +
-                'html { font-size: calc(' + zoomValue + '% * (100vw / 1920)) !important; }' +
+                '--ms: ' + ratio + ' !important;' +
             '}' +
             '</style>');
 
         $('head').append(style);
 
-        // КРИТИЧЕСКИ ВАЖНО: принудительный resize для обновления сетки навигации
+        // Сообщаем движку Lampa, что нужно обновить геометрию слоев
         if (window.appready) {
-            setTimeout(function() {
-                window.dispatchEvent(new Event('resize'));
-            }, 50);
+            // Стандартный способ Lampa обновить слои
+            if (Lampa.Layer && Lampa.Layer.update) Lampa.Layer.update();
+            
+            // Триггерим ресайз для всех слушателей
+            window.dispatchEvent(new Event('resize'));
         }
     }
 
@@ -89,11 +83,12 @@
                     if (standardSize.length && mySetting.length) {
                         mySetting.insertAfter(standardSize);
                     }
-                }, 50);
+                }, 30);
             }
         });
     }
 
+    // Запуск
     if (window.appready) {
         applyZoom();
         injectSetting();
