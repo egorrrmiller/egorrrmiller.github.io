@@ -1,33 +1,33 @@
 (function () {
     'use strict';
 
-    function rebootPlugin() {
-        // Ждем, пока Lampa полностью загрузится
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') {
-                // Создаем иконку и функционал
-                var button = $(
-                    '<div class="head__action head__action--reboot selector">' +
-                        '<svg height="36" viewBox="0 0 24 24" width="36" xmlns="http://www.w3.org/2000/svg"><path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/><path d="M0 0h24v24H0z" fill="none"/></svg>' +
-                    '</div>'
-                );
+    function initReboot() {
+        // SVG иконка перезагрузки
+        var icon = '<svg fill="#ffffff" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" stroke="#ffffff" stroke-width="0.48"><path d="M4,12a1,1,0,0,1-2,0A9.983,9.983,0,0,1,18.242,4.206V2.758a1,1,0,1,1,2,0v4a1,1,0,0,1-1,1h-4a1,1,0,0,1,0-2h1.743A7.986,7.986,0,0,0,4,12Zm17-1a1,1,0,0,0-1,1A7.986,7.986,0,0,1,7.015,18.242H8.757a1,1,0,1,0,0-2h-4a1,1,0,0,0-1,1v4a1,1,0,0,0,2,0V19.794A9.984,9.984,0,0,0,22,12,1,1,0,0,0,21,11Z" fill="currentColor"></path></svg>';
+        
+        // Создаем элемент кнопки
+        var button = $('<div id="reboot-plugin" class="head__action selector">' + icon + '</div>');
 
-                // Обработчик нажатия
-                button.on('hover:enter', function () {
-                    window.location.reload();
-                });
-
-                // Добавляем кнопку в правую часть верхнего меню (перед поиском или настройками)
-                $('.head .head__actions').prepend(button);
-            }
+        // Обработка нажатия (для пультов и мыши)
+        button.on('hover:enter hover:click hover:touch', function() {
+            window.location.reload();
         });
+
+        // Добавляем в панель (используем путь из вашего рабочего примера)
+        $('#app > div.head > div > div.head__actions').append(button);
+
+        // Обновляем навигацию Lampa, чтобы пульт "увидел" новую кнопку
+        if (window.Lampa && Lampa.Head) {
+            Lampa.Head.update();
+        }
     }
 
-    // Регистрация плагина в системе Lampa
-    if (window.appready) rebootPlugin();
-    else {
+    // Запуск плагина после готовности приложения
+    if (window.appready) {
+        initReboot();
+    } else {
         Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') rebootPlugin();
+            if (e.type === 'ready') initReboot();
         });
     }
 })();
