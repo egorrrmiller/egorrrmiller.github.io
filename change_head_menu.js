@@ -48,6 +48,14 @@
         onChange: applySettings
     });
 
+    // Параметр: Транслировать
+    Lampa.SettingsApi.addParam({
+        component: 'header_ui_tweaks',
+        param: { name: 'head_broadcast_enabled', type: 'trigger', default: true },
+        field: { name: 'Трансляция', description: 'Показать иконку трансляции' },
+        onChange: applySettings
+    });
+
     function applySettings() {
         
         // Блок: Кнопка перезагрузки
@@ -82,6 +90,10 @@
         // Блок: Профиль
         if (Lampa.Storage.field('head_profile_enabled')) $('.open--profile').removeClass('hide');
         else $('.open--profile').addClass('hide');
+
+        // Блок: Профиль
+        if (Lampa.Storage.field('head_broadcast_enabled')) $('.open--broadcast').removeClass('hide');
+        else $('.open--broadcast').addClass('hide');
 
         // Блок: Обновление навигации
         if (window.Lampa && Lampa.Head && typeof Lampa.Head.update === 'function') {
