@@ -46,7 +46,6 @@
 
     // 3. Основная логика применения настроек
     function applySettings() {
-        // --- Кнопка Перезагрузки (Ваша новая иконка) ---
         var reboot_btn = $('#custom_reboot_icon');
         if (Lampa.Storage.field('head_reboot_enabled')) {
             if (!reboot_btn.length) {
@@ -70,8 +69,6 @@
         } else {
             reboot_btn.addClass('hide');
         }
-
-        // --- Управление штатными кнопками (через селекторы) ---
         
         // Поиск
         if (Lampa.Storage.field('head_search_enabled')) $('.open--search').removeClass('hide');
