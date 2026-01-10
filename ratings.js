@@ -1,6 +1,21 @@
 (function () {
 	'use strict';
 
+	/**
+	 * Цветовое оформление рейтингов
+	 * Добавляем стили один раз при инициализации
+	 */
+	function addSettingsStyles() {
+		if ($('#ratings-style-custom').length) return;
+		$('body').append(`<style id="ratings-style-custom">
+			.rate--kp { color: #ff9000 !important; }
+			.rate--imdb { color: #f5c518 !important; }
+			.rate--tmdb { color: #01b4e4 !important; }
+			/* Делаем шрифт чуть четче для цифр */
+			.full-start__rate { font-weight: 500 !important; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }
+		</style>`);
+	}
+
 	function rating_kp_imdb(card) {
 		var network = new Lampa.Reguest();
 		var clean_title = kpCleanTitle(card.title);
@@ -8,15 +23,17 @@
 		var search_year = parseInt((search_date + '').slice(0, 4));
 		var orig = card.original_title || card.original_name;
 		var kp_prox = '';
+		
 		var params = {
 			id: card.id,
 			url: kp_prox + 'https://kinopoiskapiunofficial.tech/',
 			rating_url: kp_prox + 'https://rating.kinopoisk.ru/',
 			headers: {
-				'X-API-KEY': '24b4fca8-ab26-4c97-a675-f46012545706'
+				'X-API-KEY': '24b4fca8-ab26-4c97-a675-f46012545706' // Твой ключ
 			},
-			cache_time: 60 * 60 * 24 * 1000 //86400000 сек = 1день Время кэша в секундах
+			cache_time: 60 * 60 * 24 * 1000 
 		};
+
 		getRating();
 
 		function getRating() {
@@ -130,7 +147,7 @@
 								kp: data.ratingKinopoisk,
 								imdb: data.ratingImdb,
 								timestamp: new Date().getTime()
-							}); // Кешируем данные
+							}); 
 							return _showRating(movieRating);
 						}, function (a, c) {
 							showError(network.errorDecode(a, c));
@@ -158,7 +175,7 @@
 									kp: ratingKinopoisk,
 									imdb: ratingImdb,
 									timestamp: new Date().getTime()
-								}); // Кешируем данные
+								}); 
 								return _showRating(movieRating);
 							} catch (ex) {
 							}
@@ -174,7 +191,7 @@
 						kp: 0,
 						imdb: 0,
 						timestamp: new Date().getTime()
-					}); // Кешируем данные
+					}); 
 					return _showRating(movieRating);
 				}
 			} else {
@@ -182,7 +199,7 @@
 					kp: 0,
 					imdb: 0,
 					timestamp: new Date().getTime()
-				}); // Кешируем данные
+				}); 
 				return _showRating(_movieRating);
 			}
 		}
@@ -208,15 +225,14 @@
 		}
 
 		function showError(error) {
-			Lampa.Noty.show('Рейтинг KP: ' + error);
+			console.log('Рейтинг KP: ' + error);
 		}
 
 		function _getCache(movie) {
 			var timestamp = new Date().getTime();
-			var cache = Lampa.Storage.cache('kp_rating', 500, {}); //500 это лимит ключей
+			var cache = Lampa.Storage.cache('kp_rating', 500, {}); 
 			if (cache[movie]) {
 				if ((timestamp - cache[movie].timestamp) > params.cache_time) {
-					// Если кеш истёк, чистим его
 					delete cache[movie];
 					Lampa.Storage.set('kp_rating', cache);
 					return false;
@@ -227,7 +243,7 @@
 
 		function _setCache(movie, data) {
 			var timestamp = new Date().getTime();
-			var cache = Lampa.Storage.cache('kp_rating', 500, {}); //500 это лимит ключей
+			var cache = Lampa.Storage.cache('kp_rating', 500, {}); 
 			if (!cache[movie]) {
 				cache[movie] = data;
 				Lampa.Storage.set('kp_rating', cache);
@@ -247,6 +263,8 @@
 				var imdb_rating = !isNaN(data.imdb) && data.imdb !== null ? parseFloat(data.imdb).toFixed(1) : '0.0';
 				var render = Lampa.Activity.active().activity.render();
 				$('.wait_rating', render).remove();
+				
+				// Применяем значения и цвета
 				$('.rate--imdb', render).removeClass('hide').find('> div').eq(0).text(imdb_rating);
 				$('.rate--kp', render).removeClass('hide').find('> div').eq(0).text(kp_rating);
 			}
@@ -255,6 +273,8 @@
 
 	function startPlugin() {
 		window.rating_plugin = true;
+		addSettingsStyles(); // Добавляем стили оформления
+		
 		Lampa.Listener.follow('full', function (e) {
 			if (e.type == 'complite') {
 				var render = e.object.activity.render();
@@ -265,5 +285,6 @@
 			}
 		});
 	}
+
 	if (!window.rating_plugin) startPlugin();
 })();
