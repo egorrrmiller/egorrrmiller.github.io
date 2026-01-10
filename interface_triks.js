@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-    // Регистрируем параметр
     Lampa.SettingsApi.addParam({
         component: 'interface',
         param: {
@@ -11,14 +10,14 @@
         },
         field: {
             name: 'Точный масштаб',
-            description: 'Принудительное изменение размера элементов'
+            description: 'Безопасное изменение размера (через CSS)'
         },
         onRender: function (item) {
             var current = Lampa.Storage.field('ui_custom_zoom_fine') || '100';
             item.find('.settings-param__value').text(current + '%');
 
             item.on('hover:enter', function () {
-                var values = ['70', '75', '80', '85', '90', '95', '100', '105', '110', '115', '120'];
+                var values = ['70', '75', '80', '85', '90', '95', '100', '105', '110'];
                 var menu = values.map(function (v) {
                     return {
                         title: v + '%',
@@ -37,7 +36,11 @@
                         Lampa.Storage.set('ui_custom_zoom_fine', a.value);
                         item.find('.settings-param__value').text(a.value + '%');
                         applyZoom(a.value);
-                        Lampa.Controller.toggle('settings_interface');
+                        
+                        // Даем контроллеру Lampa время осознать изменения
+                        setTimeout(function(){
+                            Lampa.Controller.toggle('settings_interface');
+                        }, 200);
                     }
                 });
             });
@@ -46,29 +49,35 @@
 
     function applyZoom(value) {
         var zoomValue = value || Lampa.Storage.field('ui_custom_zoom_fine') || '100';
-        var decimalZoom = parseInt(zoomValue) / 100;
+        
+        // Удаляем предыдущий стиль
+        $('#lampa-custom-zoom-css').remove();
 
-        $('#lampa-custom-zoom-style').remove();
-
-        // Создаем стиль, который бьет по всем ключевым точкам
-        var style = $('<style id="lampa-custom-zoom-style">' +
-            // 1. Пробуем через корень
-            'html { font-size: ' + zoomValue + '% !important; } ' +
-            // 2. Дополнительно масштабируем главный контейнер для гарантии
-            'body > .wrap { ' +
-                'zoom: ' + decimalZoom + ' !important; ' +
+        // Рассчитываем множитель. 
+        // Lampa обычно ставит 10px или 16px на html. 
+        // Мы будем использовать vh/vw или проценты, которые не ломают расчеты координат.
+        var style = $('<style id="lampa-custom-zoom-css">' +
+            ':root {' +
+                '--ui-zoom: ' + (parseInt(zoomValue) / 100) + ';' +
             '}' +
-            // Фикс для корректного отображения фонов при зуме
-            '.background, .background__image { zoom: ' + (1 / decimalZoom) + ' !important; }' +
+            'html {' +
+                // Используем вычисление, которое Lampa подхватит в своих скриптах
+                'font-size: calc(' + zoomValue + '% * (100vw / 1280)) !important;' +
+            '}' +
+            // Адаптация для разных разрешений экрана (ТВ стандарт)
+            '@media screen and (min-width: 1920px) {' +
+                'html { font-size: calc(' + zoomValue + '% * (100vw / 1920)) !important; }' +
+            '}' +
             '</style>');
 
         $('head').append(style);
 
-        // Форсируем пересчет размеров внутри Lampa
-        setTimeout(function() {
-            $(window).trigger('resize');
-            if (window.Lampa && Lampa.Items && Lampa.Items.update) Lampa.Items.update();
-        }, 100);
+        // КРИТИЧЕСКИ ВАЖНО: принудительный resize для обновления сетки навигации
+        if (window.appready) {
+            setTimeout(function() {
+                window.dispatchEvent(new Event('resize'));
+            }, 50);
+        }
     }
 
     function injectSetting() {
@@ -80,7 +89,7 @@
                     if (standardSize.length && mySetting.length) {
                         mySetting.insertAfter(standardSize);
                     }
-                }, 10);
+                }, 50);
             }
         });
     }
