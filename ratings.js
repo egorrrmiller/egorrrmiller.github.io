@@ -1,17 +1,6 @@
 (function () {
     'use strict';
 
-    // 1. Темплейт по стандарту Lampa
-    Lampa.Template.add('settings_ratings_custom', `
-        <div>
-            <div class="settings-param selector" data-type="input" data-name="kp_unofficial_token" placeholder="Введите ключ...">
-                <div class="settings-param__name">API ключ Кинопоиск</div>
-                <div class="settings-param__value"></div>
-                <div class="settings-param__descr">Ключ от kinopoiskapiunofficial.tech для получения рейтингов</div>
-            </div>
-        </div>
-    `);
-
     function addStyles() {
         if ($('#ratings-style-custom').length) return;
         $('body').append(`<style id="ratings-style-custom">
@@ -41,9 +30,7 @@
         tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg'
     };
 
-    /**
-     * РЕГИСТРАЦИЯ КОМПОНЕНТА В НАСТРОЙКАХ
-     */
+    // Регистрируем компонент в меню
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
@@ -51,17 +38,53 @@
     });
 
     /**
-     * ОБРАБОТЧИК НАСТРОЕК
+     * НОВАЯ ЛОГИКА ОТРИСОВКИ МЕНЮ (ЧЕРЕЗ КЛАСС SETTINGS)
      */
     Lampa.Listener.follow('settings', function (e) {
         if (e.type == 'open' && e.name == 'ratings_tweaks') {
             e.body.empty();
-            var body = Lampa.Template.get('settings_ratings_custom', {}, true);
 
-            // Рендерим input
-            Lampa.Settings.main().render(body);
-            e.body.append(body);
+            // Создаем структуру параметров программно, как это делает Lampa внутри
+            var params = [
+                {
+                    name: 'kp_unofficial_token',
+                    type: 'input',
+                    title: 'API ключ Кинопоиск',
+                    descr: 'Ключ от kinopoiskapiunofficial.tech для получения рейтингов',
+                    placeholder: 'Введите ключ...',
+                    default: '24b4fca8-ab26-4c97-a675-f46012545706'
+                }
+            ];
 
+            // Проходим по параметрам и создаем HTML элементы
+            params.forEach(function(param){
+                var item = $(`
+                    <div class="settings-param selector" data-type="${param.type}" data-name="${param.name}">
+                        <div class="settings-param__name">${param.title}</div>
+                        <div class="settings-param__value">${Lampa.Storage.get(param.name, param.default)}</div>
+                        <div class="settings-param__descr">${param.descr}</div>
+                    </div>
+                `);
+
+                // Вешаем обработчик нажатия
+                item.on('hover:enter', function () {
+                    Lampa.Input.edit({
+                        title: param.title,
+                        value: Lampa.Storage.get(param.name, param.default),
+                        free: true,
+                        nosave: false
+                    }, function (new_val) {
+                        if (new_val) {
+                            Lampa.Storage.set(param.name, new_val);
+                            item.find('.settings-param__value').text(new_val);
+                        }
+                    });
+                });
+
+                e.body.append(item);
+            });
+
+            // Инициализируем навигацию контроллером
             Lampa.Controller.add('settings_ratings_ctrl', {
                 toggle: function () {
                     Lampa.Controller.collectionSet(e.body);
@@ -78,22 +101,18 @@
     });
 
     /**
-     * ЛОГИКА ОТОБРАЖЕНИЯ РЕЙТИНГОВ
+     * ЛОГИКА РЕЙТИНГОВ (Оставляем рабочую версию)
      */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
-
-        // Берем ключ из Storage, если пусто — ничего не используем
-        var kp_token = Lampa.Storage.get('kp_unofficial_token', '').trim();
-        if (!kp_token) return; // Без ключа не делаем запросы
-
+        var kp_token = Lampa.Storage.get('kp_unofficial_token', '24b4fca8-ab26-4c97-a675-f46012545706');
         var clean_title = card.title.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
+        
         var params = {
             url: 'https://kinopoiskapiunofficial.tech/',
             headers: { 'X-API-KEY': kp_token }
         };
 
-        // TMDB сразу отображаем
         if (card.vote_average) {
             var tmdb_html = $(`<div class="full-start__rate rate--tmdb"><img src="${png_icons.tmdb}" class="rate-png-icon"><div>${parseFloat(card.vote_average).toFixed(1)}</div></div>`);
             Lampa.Activity.active().activity.render().find('.rate--tmdb').replaceWith(tmdb_html);
@@ -113,7 +132,6 @@
         function _showRating(kp, imdb) {
             var render = Lampa.Activity.active().activity.render();
             $('.wait_rating', render).remove();
-
             if (kp) {
                 var kp_html = $(`<div class="full-start__rate rate--kp"><img src="${png_icons.kp}" class="rate-png-icon"><div>${parseFloat(kp).toFixed(1)}</div></div>`);
                 $('.rate--kp', render).replaceWith(kp_html);
