@@ -87,49 +87,35 @@
         };
 
         // 4. Регистрация в настройках
-var addToSettings = function() {
-    Lampa.SettingsApi.addParam({
-        component: 'more',
-        param: {
-            name: 'navigation_type_select',
-            type: 'select',
-            values: {
-                controller: 'Пульт',
-                mouse: 'Мышь',
-                mobile: 'Тачскрин'
-            },
-            default: Lampa.Storage.get('navigation_type') === 'mouse' ? 'mouse' : (Lampa.Storage.get('is_true_mobile') ? 'mobile' : 'controller')
-        },
-        field: {
-            name: 'Тип управления',
-            description: 'Выберите удобный способ навигации'
-        },
-        onChange: function(value) {
-            if (value === 'mouse') {
-                Lampa.Storage.set('navigation_type', 'mouse');
-                Lampa.Storage.set('is_true_mobile', false);
-            } else if (value === 'mobile') {
-                Lampa.Storage.set('navigation_type', 'controller');
-                Lampa.Storage.set('is_true_mobile', true);
-            } else {
-                Lampa.Storage.set('navigation_type', 'controller');
-                Lampa.Storage.set('is_true_mobile', false);
-            }
-            
-            Lampa.Storage.set('weapon_choised', "true");
-            Lampa.Noty.show('Настройки изменены. Перезагрузка...');
-            
-            setTimeout(() => { 
-                window.location.reload(); 
-            }, 500);
-        }
-    });
+        var addToSettings = function() {
+            Lampa.SettingsApi.addParam({
+                component: 'more',
+                param: {
+                    name: 'weapon_choised_reset',
+                    type: 'static',
+                    default: false
+                },
+                field: {
+                    name: 'Тип управления',
+                    description: 'Текущий: ' + (Lampa.Storage.get('navigation_type') === 'mouse' ? 'МЫШЬ' : 'ПУЛЬТ')
+                },
+                onRender: function(item) {
+                    item.find('.settings-param__value').text('Сбросить');
+                    item.on('hover:enter click', function(e) {
+                        if (e.type === 'click' && !Lampa.DeviceInput.canClick(e.originalEvent)) return;
+                        Lampa.Storage.set('weapon_choised', "false");
+                        Lampa.Noty.show('Настройки сброшены. Перезагрузка...');
+                        setTimeout(() => { window.location.reload(); }, 1000);
+                    });
+                }
+            });
 
-    if (Lampa.Storage.get('navigation_type') === 'mouse') {
-        fixMouseLogic();
-        $('body').addClass('is--mouse');
-    }
-};
+            if (Lampa.Storage.get('navigation_type') === 'mouse') {
+                fixMouseLogic();
+                $('body').addClass('is--mouse');
+            }
+        };
+
         if (window.appready) {
             showChoice();
             addToSettings();
