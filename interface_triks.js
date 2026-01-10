@@ -5,10 +5,20 @@
         if (window.switch_mouse_init) return;
         window.switch_mouse_init = true;
 
-        // 1. Определение платформы через системный метод Lampa
+        // 1. Определение платформы
+
         var platform = 'browser';
+
         if (typeof Lampa !== 'undefined' && Lampa.Platform) {
-            platform = Lampa.Platform.type() || 'browser';
+
+            if (Lampa.Platform.is('android')) platform = 'android';
+
+            else if (Lampa.Platform.is('tizen')) platform = 'tizen';
+
+            else if (Lampa.Platform.is('webos')) platform = 'webos';
+
+            else if (Lampa.Platform.is('apple')) platform = 'ios';
+
         }
 
         // 2. Функция фиксации мыши
