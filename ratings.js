@@ -30,62 +30,55 @@
         tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg'
     };
 
-    // Регистрируем компонент в меню
-    Lampa.SettingsApi.addComponent({
-        component: 'ratings_tweaks',
-        name: 'Рейтинги',
-        icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
-    });
-
     /**
-     * НОВАЯ ЛОГИКА ОТРИСОВКИ МЕНЮ (ЧЕРЕЗ КЛАСС SETTINGS)
+     * СЛУШАТЕЛЬ НАСТРОЕК
      */
     Lampa.Listener.follow('settings', function (e) {
+        // 1. ДОБАВЛЯЕМ ПУНКТ В СПИСОК (когда меню настроек создается)
+        if (e.type == 'add') {
+            var item = $(`
+                <div class="settings-folder selector" data-component="ratings_tweaks">
+                    <div class="settings-folder__icon">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>
+                    </div>
+                    <div class="settings-folder__name">Рейтинги</div>
+                </div>
+            `);
+            e.body.append(item);
+        }
+
+        // 2. ОТРИСОВЫВАЕМ СОДЕРЖИМОЕ (когда нажали на пункт)
         if (e.type == 'open' && e.name == 'ratings_tweaks') {
             e.body.empty();
+            
+            var current_token = Lampa.Storage.get('kp_unofficial_token', '24b4fca8-ab26-4c97-a675-f46012545706');
 
-            // Создаем структуру параметров программно, как это делает Lampa внутри
-            var params = [
-                {
-                    name: 'kp_unofficial_token',
-                    type: 'input',
-                    title: 'API ключ Кинопоиск',
-                    descr: 'Ключ от kinopoiskapiunofficial.tech для получения рейтингов',
-                    placeholder: 'Введите ключ...',
-                    default: '24b4fca8-ab26-4c97-a675-f46012545706'
-                }
-            ];
+            var field = $(`
+                <div class="settings-param selector" data-type="input">
+                    <div class="settings-param__name">API ключ Кинопоиск</div>
+                    <div class="settings-param__value">${current_token}</div>
+                    <div class="settings-param__descr">Нажмите для изменения ключа (kinopoiskapiunofficial.tech)</div>
+                </div>
+            `);
 
-            // Проходим по параметрам и создаем HTML элементы
-            params.forEach(function(param){
-                var item = $(`
-                    <div class="settings-param selector" data-type="${param.type}" data-name="${param.name}">
-                        <div class="settings-param__name">${param.title}</div>
-                        <div class="settings-param__value">${Lampa.Storage.get(param.name, param.default)}</div>
-                        <div class="settings-param__descr">${param.descr}</div>
-                    </div>
-                `);
-
-                // Вешаем обработчик нажатия
-                item.on('hover:enter', function () {
-                    Lampa.Input.edit({
-                        title: param.title,
-                        value: Lampa.Storage.get(param.name, param.default),
-                        free: true,
-                        nosave: false
-                    }, function (new_val) {
-                        if (new_val) {
-                            Lampa.Storage.set(param.name, new_val);
-                            item.find('.settings-param__value').text(new_val);
-                        }
-                    });
+            field.on('hover:enter', function () {
+                Lampa.Input.edit({
+                    title: 'API ключ',
+                    value: Lampa.Storage.get('kp_unofficial_token', '24b4fca8-ab26-4c97-a675-f46012545706'),
+                    free: true,
+                    nosave: false
+                }, function (new_val) {
+                    if (new_val) {
+                        Lampa.Storage.set('kp_unofficial_token', new_val);
+                        field.find('.settings-param__value').text(new_val);
+                    }
                 });
-
-                e.body.append(item);
             });
 
-            // Инициализируем навигацию контроллером
-            Lampa.Controller.add('settings_ratings_ctrl', {
+            e.body.append(field);
+
+            // Активируем навигацию по добавленным элементам
+            Lampa.Controller.add('ratings_settings_ctrl', {
                 toggle: function () {
                     Lampa.Controller.collectionSet(e.body);
                     Lampa.Controller.render();
@@ -96,12 +89,12 @@
                     Lampa.Controller.toggle('settings');
                 }
             });
-            Lampa.Controller.toggle('settings_ratings_ctrl');
+            Lampa.Controller.toggle('ratings_settings_ctrl');
         }
     });
 
     /**
-     * ЛОГИКА РЕЙТИНГОВ (Оставляем рабочую версию)
+     * ЛОГИКА РЕЙТИНГОВ (без изменений)
      */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
