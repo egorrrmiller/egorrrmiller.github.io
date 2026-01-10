@@ -1,21 +1,20 @@
 (function () {
     'use strict';
 
-    function enableMouse() {
+    function applySettings() {
         document.body.classList.add('mouse-enabled');
 
-        // Наведение – ставим focus
+        // Наведение — перенос фокуса
         document.addEventListener('mousemove', e => {
             const hover = e.target.closest('[data-film], [data-uid], .selector, .focusable, a, button');
             if (!hover) return;
 
             const cur = document.querySelector('.focus');
             if (cur && cur !== hover) cur.classList.remove('focus');
-
             hover.classList.add('focus');
         });
 
-        // Клик – эквивалент ENTER
+        // Клик -> hover:enter
         document.addEventListener('click', e => {
             const target = e.target.closest('[data-film], [data-uid], .selector, .focusable, a, button');
             if (!target) return;
@@ -26,19 +25,25 @@
             Lampa.Utils.trigger(target, 'hover:enter');
         });
 
-        // Отключаем авто-скролл навигации колёсиком
+        // Отключаем навигацию колесом
         document.addEventListener('wheel', e => {
-            e.stopPropagation();
+            Controller.block('wheel_block');
+            setTimeout(() => Controller.unblock('wheel_block'), 100);
+
+            e.stopImmediatePropagation();
         }, { passive: true });
 
-        console.log('[LAMPA] Mouse control ready');
+        console.log('[LAMPA] Mouse mode enabled');
     }
 
-    // Вешаемся когда Lampa прогрузилась
-     if (window.appready) applySettings();
+    // Сначала проверяем — Lampa уже готова?
+    if (window.appready) {
+        applySettings();
+    } 
     else {
-        Lampa.Listener.follow('app', function (event) {
-            if (event.type === 'ready') enableMouse();
+        Lampa.Listener.follow('app', e => {
+            if (e.type === 'ready') applySettings();
         });
     }
+
 })();
