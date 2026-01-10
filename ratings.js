@@ -1,18 +1,8 @@
 (function () {  
     'use strict';  
   
-    function startPlugin() {  
-        // Проверяем, инициализирована ли система Params  
-        if (typeof Lampa.Params !== 'undefined' && Lampa.Params.select) {  
-            setupSettings();  
-        } else {  
-            // Если Params еще не готов, ждем инициализации  
-            setTimeout(startPlugin, 100);  
-        }  
-    }  
-  
     function setupSettings() {  
-        // Регистрируем параметр (теперь Params точно инициализирован)  
+        // Регистрируем параметр в системе  
         Lampa.Params.select('custom_api_key', '', '');  
   
         // Регистрируем компонент  
@@ -38,7 +28,11 @@
         });  
     }  
   
-    // Инициализация плагина  
+    function startPlugin() {  
+        setupSettings();  
+    }  
+  
+    // Правильная инициализация через appready  
     if (window.appready) {  
         startPlugin();  
     } else {  
