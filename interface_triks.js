@@ -130,7 +130,6 @@ var addToSettings = function() {
         $('body').addClass('is--mouse');
     }
 };
-
         if (window.appready) {
             showChoice();
             addToSettings();
