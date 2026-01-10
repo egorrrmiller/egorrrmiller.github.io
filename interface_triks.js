@@ -2,38 +2,46 @@
     'use strict';
 
     function startSwitchMouse() {
-        if (window.switch_mouse_init) return;
-        window.switch_mouse_init = true;
+        window.switch_mouse = true;
 
-        // 1. Функция фиксации мыши
+        // 1. Определение платформы (БЕЗ ИЗМЕНЕНИЙ)
+        var platform = 'browser';
+        if (typeof Lampa !== 'undefined' && Lampa.Platform) {
+            if (Lampa.Platform.is('android')) platform = 'android';
+            else if (Lampa.Platform.is('tizen')) platform = 'tizen';
+            else if (Lampa.Platform.is('webos')) platform = 'webos';
+            else if (Lampa.Platform.is('apple')) platform = 'ios';
+        }
+
+        // 2. Функция фиксации мыши
         var fixMouseLogic = function() {
-            // Блокируем стандартную реакцию Lampa (прыжки по элементам)
+            // Убрал блокировку всплытия, чтобы работал нативный скролл
             window.addEventListener('wheel', function(e) {
-                if (Lampa.Storage.get('navigation_type') === 'mouse') {
-                    e.stopImmediatePropagation();
-                }
-            }, true); // true обязателен для перехвата до того, как Lampa его обработает
+                // Пусто, просто даем браузеру крутить
+            }, {passive: true});
 
             var styles = `
+                /* Разрешаем нативный скролл */
                 .scroll--mask, .items-line__body, .category-full__body, .full-start__body, .settings-list, .layer--full {
                     overflow-y: auto !important;
                     overflow-x: hidden !important;
                     -webkit-overflow-scrolling: touch !important;
                 }
+                /* Прячем полосы прокрутки для эстетики ТВ */
                 .scroll--mask::-webkit-scrollbar, .items-line__body::-webkit-scrollbar {
                     display: none;
                     width: 0;
                 }
+                /* Убираем блокировку событий мыши в слоях */
                 .scroll--over { pointer-events: all !important; }
             `;
             
-            if (!$('#lampa-mouse-fix').length) {
-                $('<style id="lampa-mouse-fix">').text(styles).appendTo('head');
-            }
+            $('<style id="lampa-mouse-fix">').text(styles).appendTo('head');
         };
 
-        // 2. Создание меню выбора
+        // 3. Создание меню выбора (ИСПРАВЛЕН ТОЛЬКО ВЫЗОВ И КНОПКА МЫШИ)
         var showChoice = function() {
+            // Проверка на строку "true" или булево true
             var is_done = Lampa.Storage.get("weapon_choised");
             if (is_done === "true" || is_done === true) return;
 
@@ -48,9 +56,10 @@
             };
 
             let btns = [
-                { name: "Пульт (Классика)", action: () => setMode("controller", false) },
-                { name: "Мышь / AirMouse", action: () => setMode("mouse", false) }, 
-                { name: "Тачскрин / Смартфон", action: () => setMode("controller", true) }
+                { name: "Пульт (Классика)", action: () => setMode("controller", "false") },
+                // ТУТ ИЗМЕНЕНО НА "false", ЧТОБЫ НЕ БЫЛО МОБИЛКИ
+                { name: "Мышь / AirMouse", action: () => setMode("mouse", "false") }, 
+                { name: "Тачскрин / Смартфон", action: () => setMode("controller", "true") }
             ];
 
             btns.forEach(b => {
@@ -62,7 +71,7 @@
                 scroll.append(item);
             });
 
-            html.find('.lang__info').text('Выберите тип управления:');
+            html.find('.lang__info').text('Платформа: ' + platform.toUpperCase());
             html.find('.lang__selector').empty().append(scroll.render());
             $('body').append(html);
 
@@ -70,51 +79,57 @@
                 toggle: () => {
                     Lampa.Controller.collectionSet(scroll.render());
                     Lampa.Controller.collectionFocus(false, scroll.render());
-                }
+                },
+                up: () => Lampa.Navigator.move('up'),
+                down: () => Lampa.Navigator.move('down')
             });
             Lampa.Controller.toggle('select_weapon');
         };
 
-        // 3. Регистрация выпадающего списка в настройках
-        var addToSettings = function() {
-            Lampa.SettingsApi.addParam({
-                component: 'more',
-                param: {
-                    name: 'navigation_type_select',
-                    type: 'select',
-                    values: {
-                        controller: 'Пульт',
-                        mouse: 'Мышь',
-                        mobile: 'Тачскрин'
-                    },
-                    default: Lampa.Storage.get('navigation_type') === 'mouse' ? 'mouse' : (Lampa.Storage.get('is_true_mobile') ? 'mobile' : 'controller')
-                },
-                field: {
-                    name: 'Тип управления',
-                    description: 'Выберите удобный способ навигации'
-                },
-                onChange: function(value) {
-                    if (value === 'mouse') {
-                        Lampa.Storage.set('navigation_type', 'mouse');
-                        Lampa.Storage.set('is_true_mobile', false);
-                    } else if (value === 'mobile') {
-                        Lampa.Storage.set('navigation_type', 'controller');
-                        Lampa.Storage.set('is_true_mobile', true);
-                    } else {
-                        Lampa.Storage.set('navigation_type', 'controller');
-                        Lampa.Storage.set('is_true_mobile', false);
-                    }
-                    
-                    Lampa.Storage.set('weapon_choised', "true");
-                    window.location.reload();
-                }
-            });
-
-            if (Lampa.Storage.get('navigation_type') === 'mouse') {
-                fixMouseLogic();
-                $('body').addClass('is--mouse');
+        // 4. Регистрация в настройках
+var addToSettings = function() {
+    Lampa.SettingsApi.addParam({
+        component: 'more',
+        param: {
+            name: 'navigation_type_select',
+            type: 'select',
+            values: {
+                controller: 'Пульт',
+                mouse: 'Мышь',
+                mobile: 'Тачскрин'
+            },
+            default: Lampa.Storage.get('navigation_type') === 'mouse' ? 'mouse' : (Lampa.Storage.get('is_true_mobile') ? 'mobile' : 'controller')
+        },
+        field: {
+            name: 'Тип управления',
+            description: 'Выберите удобный способ навигации'
+        },
+        onChange: function(value) {
+            if (value === 'mouse') {
+                Lampa.Storage.set('navigation_type', 'mouse');
+                Lampa.Storage.set('is_true_mobile', false);
+            } else if (value === 'mobile') {
+                Lampa.Storage.set('navigation_type', 'controller');
+                Lampa.Storage.set('is_true_mobile', true);
+            } else {
+                Lampa.Storage.set('navigation_type', 'controller');
+                Lampa.Storage.set('is_true_mobile', false);
             }
-        };
+            
+            Lampa.Storage.set('weapon_choised', "true");
+            Lampa.Noty.show('Настройки изменены. Перезагрузка...');
+            
+            setTimeout(() => { 
+                window.location.reload(); 
+            }, 500);
+        }
+    });
+
+    if (Lampa.Storage.get('navigation_type') === 'mouse') {
+        fixMouseLogic();
+        $('body').addClass('is--mouse');
+    }
+};
 
         if (window.appready) {
             showChoice();
@@ -129,5 +144,5 @@
         }
     }
 
-    startSwitchMouse();
+    if (!window.switch_mouse) startSwitchMouse();
 })();
