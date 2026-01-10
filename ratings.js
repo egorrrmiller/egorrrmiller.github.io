@@ -1,146 +1,319 @@
 (function () {
-    'use strict';
+	'use strict';
 
-    var default_token = '24b4fca8-ab26-4c97-a675-f46012545706';
-
-    // Твои ссылки на официальные логотипы
-    var svg_icons = {
-        kp: 'https://logo-teka.com/wp-content/uploads/2025/07/kinopoisk-sign-logo.svg',
-        tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg',
-        imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg'
-    };
-
-    function addSettingsStyles() {
-        if ($('#ratings-style-custom').length) return;
-        $('body').append(`<style id="ratings-style-custom">
-            .full-start__rate.custom-rate { 
-                display: inline-flex !important; 
-                align-items: center !important; 
-                gap: 8px !important; 
-                margin-right: 15px !important;
-                font-weight: bold !important;
-                font-size: 1.1em !important;
-                vertical-align: middle;
-            }
-            /* Цвета для цифр */
-            .rate--kp-custom { color: #ff9000 !important; }
-            .rate--imdb-custom { color: #f5c518 !important; }
-            .rate--tmdb-custom { color: #01b4e4 !important; }
-            
-            /* Стили для SVG иконок */
-            .rate-svg-icon {
-                height: 1.2em;
-                width: auto;
-                display: block;
-                object-fit: contain;
-            }
-        </style>`);
-    }
-
-    // Регистрация в меню (без инпутов через API, рисуем сами)
-    Lampa.SettingsApi.addComponent({
-        component: 'ratings_tweaks',
-        name: 'Рейтинги',
-        icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
-    });
-
-    Lampa.Listener.follow('settings', function (e) {
-        if (e.type == 'open' && e.name == 'ratings_tweaks') {
-            e.body.empty();
-            var current_token = Lampa.Storage.get('kp_unofficial_token', default_token);
-
-            var item = $(`
-                <div class="settings-param selector">
-                    <div class="settings-param__name">API ключ Кинопоиск</div>
-                    <div class="settings-param__value">${current_token}</div>
-                    <div class="settings-param__descr">Нажмите для изменения ключа (Unofficial API).</div>
-                </div>
-            `);
-
-            item.on('hover:enter', function () {
-                Lampa.Input.edit({
-                    title: 'API Ключ',
-                    value: Lampa.Storage.get('kp_unofficial_token', default_token),
-                    free: true
-                }, function (new_val) {
-                    if (new_val) {
-                        Lampa.Storage.set('kp_unofficial_token', new_val);
-                        item.find('.settings-param__value').text(new_val);
-                    }
-                });
-            });
-
-            e.body.append(item);
-
-            Lampa.Controller.add('ratings_tweaks_ctrl', {
-                toggle: function () {
-                    Lampa.Controller.collectionSet(e.body);
-                    Lampa.Controller.render();
-                },
-                up: Lampa.Select.prev,
-                down: Lampa.Select.next,
-                back: function () { Lampa.Controller.toggle('settings'); }
-            });
-            Lampa.Controller.toggle('ratings_tweaks_ctrl');
-        }
-    });
-
-    function rating_kp_imdb(card) {
-        var network = new Lampa.Reguest();
-        var kp_token = Lampa.Storage.get('kp_unofficial_token', default_token);
+	function rating_kp_imdb(card) {
+		var network = new Lampa.Reguest();
+		var clean_title = kpCleanTitle(card.title);
+		var search_date = card.release_date || card.first_air_date || card.last_air_date || '0000';
+		var search_year = parseInt((search_date + '').slice(0, 4));
+		var orig = card.original_title || card.original_name;
+		var kp_prox = '';
+		var params = {
+			id: card.id,
+			url: kp_prox + 'https://kinopoiskapiunofficial.tech/',
+			rating_url: kp_prox + 'https://rating.kinopoisk.ru/',
+			headers: {
+				'X-API-KEY': '24b4fca8-ab26-4c97-a675-f46012545706'
+			},
+			cache_time: 60 * 60 * 24 * 1000
+		};
         
-        // Поиск фильма в КП
-        var search_url = 'https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(card.title);
-        
-        network.silent(search_url, function (json) {
-            var items = json.films || json.items || [];
-            if (items.length) {
-                var id = items[0].filmId || items[0].kinopoiskId;
-                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + id, function (data) {
-                    _showRating(data.ratingKinopoisk, data.ratingImdb, card.vote_average);
-                }, function(){}, false, { headers: { 'X-API-KEY': kp_token } });
-            }
-        }, function(){}, false, { headers: { 'X-API-KEY': kp_token } });
+        // Ссылки на иконки, которые ты скинул
+        var icons = {
+            kp: 'https://logo-teka.com/wp-content/uploads/2025/07/kinopoisk-sign-logo.svg',
+            tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg',
+            imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg'
+        };
 
-        function _showRating(kp, imdb, tmdb) {
-            var render = Lampa.Activity.active().activity.render();
-            $('.wait_rating', render).remove();
-            
-            // Прячем стандартные элементы
-            $('.rate--kp, .rate--imdb, .rate--tmdb', render).addClass('hide');
-            // Удаляем наши старые кастомные элементы, если они были
-            $('.custom-rate', render).remove();
+		getRating();
 
-            var rateLine = $('.info__rate', render);
+		function getRating() {
+			var movieRating = _getCache(params.id);
+			if (movieRating) {
+				return _showRating(movieRating[params.id]);
+			} else {
+				searchFilm();
+			}
+		}
 
-            // Отрисовка TMDB
-            if (tmdb) {
-                rateLine.append(`<div class="full-start__rate custom-rate rate--tmdb-custom"><img src="${svg_icons.tmdb}" class="rate-svg-icon"><div>${parseFloat(tmdb).toFixed(1)}</div></div>`);
-            }
-            // Отрисовка КП
-            if (kp && kp !== 'null') {
-                rateLine.append(`<div class="full-start__rate custom-rate rate--kp-custom"><img src="${svg_icons.kp}" class="rate-svg-icon"><div>${kp}</div></div>`);
-            }
-            // Отрисовка IMDb
-            if (imdb && imdb !== 'null') {
-                rateLine.append(`<div class="full-start__rate custom-rate rate--imdb-custom"><img src="${svg_icons.imdb}" class="rate-svg-icon"><div>${imdb}</div></div>`);
-            }
-        }
-    }
+		function searchFilm() {
+			var url = params.url;
+			var url_by_title = Lampa.Utils.addUrlComponent(url + 'api/v2.1/films/search-by-keyword', 'keyword=' + encodeURIComponent(clean_title));
+			if (card.imdb_id) url = Lampa.Utils.addUrlComponent(url + 'api/v2.2/films', 'imdbId=' + encodeURIComponent(card.imdb_id));
+			else url = url_by_title;
+			network.clear();
+			network.timeout(15000);
+			network.silent(url, function (json) {
+				if (json.items && json.items.length) chooseFilm(json.items);
+				else if (json.films && json.films.length) chooseFilm(json.films);
+				else if (url !== url_by_title) {
+					network.clear();
+					network.timeout(15000);
+					network.silent(url_by_title, function (json) {
+						if (json.items && json.items.length) chooseFilm(json.items);
+						else if (json.films && json.films.length) chooseFilm(json.films);
+						else chooseFilm([]);
+					}, function (a, c) {
+						showError(network.errorDecode(a, c));
+					}, false, {
+						headers: params.headers
+					});
+				} else chooseFilm([]);
+			}, function (a, c) {
+				showError(network.errorDecode(a, c));
+			}, false, {
+				headers: params.headers
+			});
+		}
 
-    function startPlugin() {
-        window.rating_plugin = true;
-        addSettingsStyles();
-        Lampa.Listener.follow('full', function (e) {
-            if (e.type == 'complite') {
-                var render = e.object.activity.render();
-                if (!$('.wait_rating', render).length) {
-                    $('.info__rate', render).after('<div style="width:2em;margin-top:1em;margin-right:1em" class="wait_rating"><div class="broadcast__scan"><div></div></div><div>');
-                    rating_kp_imdb(e.data.movie);
+		function chooseFilm(items) {
+			if (items && items.length) {
+				var is_sure = false;
+				var is_imdb = false;
+				items.forEach(function (c) {
+					var year = c.start_date || c.year || '0000';
+					c.tmp_year = parseInt((year + '').slice(0, 4));
+				});
+				if (card.imdb_id) {
+					var tmp = items.filter(function (elem) {
+						return (elem.imdb_id || elem.imdbId) == card.imdb_id;
+					});
+					if (tmp.length) {
+						items = tmp;
+						is_sure = true;
+						is_imdb = true;
+					}
+				}
+				var cards = items;
+				if (cards.length) {
+					if (orig) {
+						var _tmp = cards.filter(function (elem) {
+							return containsTitle(elem.orig_title || elem.nameOriginal, orig) || containsTitle(elem.en_title || elem.nameEn, orig) || containsTitle(elem.title || elem.ru_title || elem.nameRu, orig);
+						});
+						if (_tmp.length) {
+							cards = _tmp;
+							is_sure = true;
+						}
+					}
+					if (card.title) {
+						var _tmp2 = cards.filter(function (elem) {
+							return containsTitle(elem.title || elem.ru_title || elem.nameRu, card.title) || containsTitle(elem.en_title || elem.nameEn, card.title) || containsTitle(elem.orig_title || elem.nameOriginal, card.title);
+						});
+						if (_tmp2.length) {
+							cards = _tmp2;
+							is_sure = true;
+						}
+					}
+					if (cards.length > 1 && search_year) {
+						var _tmp3 = cards.filter(function (c) {
+							return c.tmp_year == search_year;
+						});
+						if (!_tmp3.length) _tmp3 = cards.filter(function (c) {
+							return c.tmp_year && c.tmp_year > search_year - 2 && c.tmp_year < search_year + 2;
+						});
+						if (_tmp3.length) cards = _tmp3;
+					}
+				}
+				if (cards.length == 1 && is_sure && !is_imdb) {
+					if (search_year && cards[0].tmp_year) {
+						is_sure = cards[0].tmp_year > search_year - 2 && cards[0].tmp_year < search_year + 2;
+					}
+					if (is_sure) {
+						is_sure = false;
+						if (orig) {
+							is_sure |= equalTitle(cards[0].orig_title || cards[0].nameOriginal, orig) || equalTitle(cards[0].en_title || cards[0].nameEn, orig) || equalTitle(cards[0].title || cards[0].ru_title || cards[0].nameRu, orig);
+						}
+						if (card.title) {
+							is_sure |= equalTitle(cards[0].title || cards[0].ru_title || cards[0].nameRu, card.title) || equalTitle(cards[0].en_title || cards[0].nameEn, card.title) || equalTitle(cards[0].orig_title || cards[0].nameOriginal, card.title);
+						}
+					}
+				}
+				if (cards.length == 1 && is_sure) {
+					var id = cards[0].kp_id || cards[0].kinopoisk_id || cards[0].kinopoiskId || cards[0].filmId;
+					var base_search = function base_search() {
+						network.clear();
+						network.timeout(15000);
+						network.silent(params.url + 'api/v2.2/films/' + id, function (data) {
+							var movieRating = _setCache(params.id, {
+								kp: data.ratingKinopoisk,
+								imdb: data.ratingImdb,
+								timestamp: new Date().getTime()
+							});
+							return _showRating(movieRating);
+						}, function (a, c) {
+							showError(network.errorDecode(a, c));
+						}, false, {
+							headers: params.headers
+						});
+					};
+					network.clear();
+					network.timeout(5000);
+					network["native"](params.rating_url + id + '.xml', function (str) {
+						if (str.indexOf('<rating>') >= 0) {
+							try {
+								var ratingKinopoisk = 0;
+								var ratingImdb = 0;
+								var xml = $($.parseXML(str));
+								var kp_rating = xml.find('kp_rating');
+								if (kp_rating.length) {
+									ratingKinopoisk = parseFloat(kp_rating.text());
+								}
+								var imdb_rating = xml.find('imdb_rating');
+								if (imdb_rating.length) {
+									ratingImdb = parseFloat(imdb_rating.text());
+								}
+								var movieRating = _setCache(params.id, {
+									kp: ratingKinopoisk,
+									imdb: ratingImdb,
+									timestamp: new Date().getTime()
+								});
+								return _showRating(movieRating);
+							} catch (ex) {
+							}
+						}
+						base_search();
+					}, function (a, c) {
+						base_search();
+					}, false, {
+						dataType: 'text'
+					});
+				} else {
+					var movieRating = _setCache(params.id, {
+						kp: 0,
+						imdb: 0,
+						timestamp: new Date().getTime()
+					});
+					return _showRating(movieRating);
+				}
+			} else {
+				var _movieRating = _setCache(params.id, {
+					kp: 0,
+					imdb: 0,
+					timestamp: new Date().getTime()
+				});
+				return _showRating(_movieRating);
+			}
+		}
+
+		function cleanTitle(str){
+			return str.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
+		}
+
+		function kpCleanTitle(str){
+			return cleanTitle(str).replace(/^[ \/\\]+/, '').replace(/[ \/\\]+$/, '').replace(/\+( *[+\/\\])+/g, '+').replace(/([+\/\\] *)+\+/g, '+').replace(/( *[\/\\]+ *)+/g, '+');
+		}
+
+		function normalizeTitle(str){
+			return cleanTitle(str.toLowerCase().replace(/[\-\u2010-\u2015\u2E3A\u2E3B\uFE58\uFE63\uFF0D]+/g, '-').replace(/ё/g, 'е'));
+		}
+
+		function equalTitle(t1, t2){
+			return typeof t1 === 'string' && typeof t2 === 'string' && normalizeTitle(t1) === normalizeTitle(t2);
+		}
+
+		function containsTitle(str, title){
+			return typeof str === 'string' && typeof title === 'string' && normalizeTitle(str).indexOf(normalizeTitle(title)) !== -1;
+		}
+
+		function showError(error) {
+			Lampa.Noty.show('Рейтинг KP: ' + error);
+		}
+
+		function _getCache(movie) {
+			var timestamp = new Date().getTime();
+			var cache = Lampa.Storage.cache('kp_rating', 500, {});
+			if (cache[movie]) {
+				if ((timestamp - cache[movie].timestamp) > params.cache_time) {
+					delete cache[movie];
+					Lampa.Storage.set('kp_rating', cache);
+					return false;
+				}
+			} else return false;
+			return cache;
+		}
+
+		function _setCache(movie, data) {
+			var timestamp = new Date().getTime();
+			var cache = Lampa.Storage.cache('kp_rating', 500, {});
+			if (!cache[movie]) {
+				cache[movie] = data;
+				Lampa.Storage.set('kp_rating', cache);
+			} else {
+				if ((timestamp - cache[movie].timestamp) > params.cache_time) {
+					data.timestamp = timestamp;
+					cache[movie] = data;
+					Lampa.Storage.set('kp_rating', cache);
+				} else data = cache[movie];
+			}
+			return data;
+		}
+
+		function _showRating(data) {
+			if (data) {
+				var kp_rating = !isNaN(data.kp) && data.kp !== null ? parseFloat(data.kp).toFixed(1) : '0.0';
+				var imdb_rating = !isNaN(data.imdb) && data.imdb !== null ? parseFloat(data.imdb).toFixed(1) : '0.0';
+                var tmdb_rating = card.vote_average ? parseFloat(card.vote_average).toFixed(1) : '0.0';
+                
+				var render = Lampa.Activity.active().activity.render();
+				$('.wait_rating', render).remove();
+                
+                // Удаляем старые кастомные элементы, чтобы не дублировались
+                $('.custom-rate-item', render).remove();
+                // Скрываем стандартные текстовые блоки Лампы
+                $('.rate--imdb, .rate--kp, .rate--tmdb', render).addClass('hide');
+
+                var container = $('.info__rate', render);
+
+                // Отрисовка TMDB
+                if (tmdb_rating > 0) {
+                    container.append(`<div class="custom-rate-item rate--tmdb-color"><img src="${icons.tmdb}" class="rate-svg-icon"><span>${tmdb_rating}</span></div>`);
                 }
-            }
-        });
-    }
+                // Отрисовка KP
+                if (kp_rating > 0) {
+                    container.append(`<div class="custom-rate-item rate--kp-color"><img src="${icons.kp}" class="rate-svg-icon"><span>${kp_rating}</span></div>`);
+                }
+                // Отрисовка IMDb
+                if (imdb_rating > 0) {
+                    container.append(`<div class="custom-rate-item rate--imdb-color"><img src="${icons.imdb}" class="rate-svg-icon"><span>${imdb_rating}</span></div>`);
+                }
+			}
+		}
+	}
 
-    if (!window.rating_plugin) startPlugin();
+	function startPlugin() {
+		window.rating_plugin = true;
+        
+        // Добавляем стили
+        if (!$('#ratings-style-final').length) {
+            $('body').append(`<style id="ratings-style-final">
+                .custom-rate-item { 
+                    display: inline-flex !important; 
+                    align-items: center !important; 
+                    margin-right: 15px !important; 
+                    font-weight: bold !important;
+                    font-size: 1.2em !important;
+                }
+                .rate--kp-color { color: #ff9000 !important; }
+                .rate--imdb-color { color: #f5c518 !important; }
+                .rate--tmdb-color { color: #01b4e4 !important; }
+                .rate-svg-icon {
+                    height: 1.1em;
+                    width: auto;
+                    margin-right: 7px;
+                    vertical-align: middle;
+                }
+            </style>`);
+        }
+
+		Lampa.Listener.follow('full', function (e) {
+			if (e.type == 'complite') {
+				var render = e.object.activity.render();
+				if (!$('.wait_rating', render).length) {
+					$('.info__rate', render).after('<div style="width:2em;margin-top:1em;margin-right:1em" class="wait_rating"><div class="broadcast__scan"><div></div></div><div>');
+					rating_kp_imdb(e.data.movie);
+				}
+			}
+		});
+	}
+	if (!window.rating_plugin) startPlugin();
 })();
