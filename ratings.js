@@ -1,45 +1,43 @@
 (function () {
     'use strict';
 
-    // Твой токен по умолчанию
     var default_token = '24b4fca8-ab26-4c97-a675-f46012545706';
 
-    /**
-     * СТИЛИ ОФОРМЛЕНИЯ
-     */
+    // Твои ссылки на официальные логотипы
+    var svg_icons = {
+        kp: 'https://logo-teka.com/wp-content/uploads/2025/07/kinopoisk-sign-logo.svg',
+        tmdb: 'https://www.themoviedb.org/assets/2/v4/logos/v2/blue_square_1-5bdc75aaebeb75dc7ae79426ddd9be3b2be1e342510f8202baf6bffa71d7f5c4.svg',
+        imdb: 'https://upload.wikimedia.org/wikipedia/commons/6/69/IMDB_Logo_2016.svg'
+    };
+
     function addSettingsStyles() {
         if ($('#ratings-style-custom').length) return;
         $('body').append(`<style id="ratings-style-custom">
-            .full-start__rate { 
+            .full-start__rate.custom-rate { 
                 display: inline-flex !important; 
                 align-items: center !important; 
                 gap: 8px !important; 
                 margin-right: 15px !important;
                 font-weight: bold !important;
                 font-size: 1.1em !important;
+                vertical-align: middle;
             }
-            .rate--kp { color: #ff9000 !important; }
-            .rate--imdb { color: #f5c518 !important; }
-            .rate--tmdb { color: #01b4e4 !important; }
-
-            .rate-png-icon {
-                width: 1.4em;
-                height: 1.4em;
+            /* Цвета для цифр */
+            .rate--kp-custom { color: #ff9000 !important; }
+            .rate--imdb-custom { color: #f5c518 !important; }
+            .rate--tmdb-custom { color: #01b4e4 !important; }
+            
+            /* Стили для SVG иконок */
+            .rate-svg-icon {
+                height: 1.2em;
+                width: auto;
+                display: block;
                 object-fit: contain;
-                flex-shrink: 0;
             }
         </style>`);
     }
 
-    // Официальные PNG иконки
-    var png_icons = {
-        kp: 'https://raw.githubusercontent.com/nb557/plugins/master/rating/img/kp.png',
-        imdb: 'https://raw.githubusercontent.com/nb557/plugins/master/rating/img/imdb.png'
-    };
-
-    /**
-     * МЕНЮ НАСТРОЕК (Исправлено по документации)
-     */
+    // Регистрация в меню (без инпутов через API, рисуем сами)
     Lampa.SettingsApi.addComponent({
         component: 'ratings_tweaks',
         name: 'Рейтинги',
@@ -55,7 +53,7 @@
                 <div class="settings-param selector">
                     <div class="settings-param__name">API ключ Кинопоиск</div>
                     <div class="settings-param__value">${current_token}</div>
-                    <div class="settings-param__descr">Нажмите для изменения. Используется для получения рейтинга KP.</div>
+                    <div class="settings-param__descr">Нажмите для изменения ключа (Unofficial API).</div>
                 </div>
             `);
 
@@ -63,8 +61,7 @@
                 Lampa.Input.edit({
                     title: 'API Ключ',
                     value: Lampa.Storage.get('kp_unofficial_token', default_token),
-                    free: true,
-                    nosave: false
+                    free: true
                 }, function (new_val) {
                     if (new_val) {
                         Lampa.Storage.set('kp_unofficial_token', new_val);
@@ -88,45 +85,45 @@
         }
     });
 
-    /**
-     * ОСНОВНАЯ ЛОГИКА (Твой рабочий код)
-     */
     function rating_kp_imdb(card) {
         var network = new Lampa.Reguest();
         var kp_token = Lampa.Storage.get('kp_unofficial_token', default_token);
-        var clean_title = card.title.replace(/[\s.,:;’'`!?]+/g, ' ').trim();
         
-        var params = {
-            id: card.id,
-            url: 'https://kinopoiskapiunofficial.tech/',
-            headers: { 'X-API-KEY': kp_token },
-            cache_time: 86400000 
-        };
-
-        // Поиск фильма
-        var search_url = params.url + 'api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(clean_title);
+        // Поиск фильма в КП
+        var search_url = 'https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?keyword=' + encodeURIComponent(card.title);
+        
         network.silent(search_url, function (json) {
             var items = json.films || json.items || [];
             if (items.length) {
                 var id = items[0].filmId || items[0].kinopoiskId;
-                // Получение деталей (рейтингов)
-                network.silent(params.url + 'api/v2.2/films/' + id, function (data) {
-                    _showRating(data.ratingKinopoisk, data.ratingImdb);
-                }, function(){}, false, { headers: params.headers });
+                network.silent('https://kinopoiskapiunofficial.tech/api/v2.2/films/' + id, function (data) {
+                    _showRating(data.ratingKinopoisk, data.ratingImdb, card.vote_average);
+                }, function(){}, false, { headers: { 'X-API-KEY': kp_token } });
             }
-        }, function(){}, false, { headers: params.headers });
+        }, function(){}, false, { headers: { 'X-API-KEY': kp_token } });
 
-        function _showRating(kp, imdb) {
+        function _showRating(kp, imdb, tmdb) {
             var render = Lampa.Activity.active().activity.render();
             $('.wait_rating', render).remove();
+            
+            // Прячем стандартные элементы
+            $('.rate--kp, .rate--imdb, .rate--tmdb', render).addClass('hide');
+            // Удаляем наши старые кастомные элементы, если они были
+            $('.custom-rate', render).remove();
 
-            if (kp) {
-                var kp_html = $(`<div class="full-start__rate rate--kp"><img src="${png_icons.kp}" class="rate-png-icon"><div>${parseFloat(kp).toFixed(1)}</div></div>`);
-                $('.rate--kp', render).replaceWith(kp_html);
+            var rateLine = $('.info__rate', render);
+
+            // Отрисовка TMDB
+            if (tmdb) {
+                rateLine.append(`<div class="full-start__rate custom-rate rate--tmdb-custom"><img src="${svg_icons.tmdb}" class="rate-svg-icon"><div>${parseFloat(tmdb).toFixed(1)}</div></div>`);
             }
-            if (imdb) {
-                var imdb_html = $(`<div class="full-start__rate rate--imdb"><img src="${png_icons.imdb}" class="rate-png-icon"><div>${parseFloat(imdb).toFixed(1)}</div></div>`);
-                $('.rate--imdb', render).replaceWith(imdb_html);
+            // Отрисовка КП
+            if (kp && kp !== 'null') {
+                rateLine.append(`<div class="full-start__rate custom-rate rate--kp-custom"><img src="${svg_icons.kp}" class="rate-svg-icon"><div>${kp}</div></div>`);
+            }
+            // Отрисовка IMDb
+            if (imdb && imdb !== 'null') {
+                rateLine.append(`<div class="full-start__rate custom-rate rate--imdb-custom"><img src="${svg_icons.imdb}" class="rate-svg-icon"><div>${imdb}</div></div>`);
             }
         }
     }
@@ -137,8 +134,10 @@
         Lampa.Listener.follow('full', function (e) {
             if (e.type == 'complite') {
                 var render = e.object.activity.render();
-                $('.info__rate', render).after('<div style="width:2em;margin-top:1em;margin-right:1em" class="wait_rating"><div class="broadcast__scan"><div></div></div><div>');
-                rating_kp_imdb(e.data.movie);
+                if (!$('.wait_rating', render).length) {
+                    $('.info__rate', render).after('<div style="width:2em;margin-top:1em;margin-right:1em" class="wait_rating"><div class="broadcast__scan"><div></div></div><div>');
+                    rating_kp_imdb(e.data.movie);
+                }
             }
         });
     }
