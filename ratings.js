@@ -33,40 +33,8 @@
 
     /**
      * ИНИЦИАЛИЗАЦИЯ НАСТРОЕК ЧЕРЕЗ СТАНДАРТНОЕ API
-     
-    function setupSettings() {
-        Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');
-        
-        // Регистрируем компонент
-        Lampa.SettingsApi.addComponent({
-            component: 'ratings_tweaks',
-            name: 'Рейтинги',
-            icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>'
-        });
-
-        // Твой код для addParam
-        Lampa.SettingsApi.addParam({
-            component: 'ratings_tweaks',
-            param: {
-                name: 'kp_unofficial_token',
-                type: 'input',
-                default: '24b4fca8-ab26-4c97-a675-f46012545706', // Поставил рабочий как дефолт
-                placeholder: 'Введите ключ...'
-            },
-            field: {
-                name: 'API ключ Кинопоиск',
-                descr: 'Используется ключ от kinopoiskapiunofficial.tech'
-            },
-            onChange: function (value) {
-                // Валидация формата UUID
-                if (value && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)) {
-                    Lampa.Noty.show('Неверный формат токена');
-                    return false;
-                }
-            }
-        });
-    }
-*/
+    */
+    
 function setupSettings() {  
     Lampa.Params.select('kp_unofficial_token', '', '24b4fca8-ab26-4c97-a675-f46012545706');  
       
@@ -81,9 +49,16 @@ function setupSettings() {
     Lampa.SettingsApi.addComponent({  
         component: 'ratings_tweaks',  
         name: 'Рейтинги',  
-        icon: '<svg>...</svg>',  
+        icon: '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" fill="white"/></svg>',  
         template: 'settings_ratings_tweaks'  
     });  
+
+    Lampa.Settings.listener.follow('open', function (e) {  
+        if(e.name == 'ratings_tweaks'){  
+            // Инициализация параметров шаблона  
+            Lampa.Settings.update();  
+        }  
+    }); 
 }
     
     /**
