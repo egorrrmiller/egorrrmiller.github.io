@@ -62,6 +62,7 @@
                         console.log('tmdbData', tmdbData);
                         if (tmdbData && tmdbData.episodes_original) {
                             seasonCache[data.folder_name] = tmdbData.episodes_original;
+                            episodes = tmdbData.episodes_original;
                         }
                     }, (error) => {
                         console.error('API error:', error);
