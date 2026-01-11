@@ -1,12 +1,20 @@
 /*
-* 1.
+* 1. Получаем карточку фильма/сериала
 *
 * */
 
 (function () {
-    let tmdb_cache = {};
+    
+    const regex = /(?:часть|part|pt?\.?)\s*(\d+)/i;
 
-    // 1. Слушаем событие рендера каждого файла в списке торрентов
+    const activity = Lampa.Activity.active();
+
+    const card = activity.card;
+    
+    const episodes = card.episodes;
+    
+    console.log(episodes)
+    
     Lampa.Listener.follow('torrent_file', (e) => {
 
         if (e.type === 'render'){
