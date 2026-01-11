@@ -18,32 +18,38 @@
                 );  
   
                 // Обработчик кнопки "Готово"  
-                $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {  
-                    try {  
-                        var input = $('.simple-keyboard-input');  
-                          
-                        if (input.length) {  
-                            // Фокусируем поле ввода  
-                            input.focus();  
-                              
-                            // Получаем значение из поля ввода  
-                            var value = input.val();  
-                              
-                            // Вызываем колбэк напрямую, если он есть  
-                            if (window.Lampa.Input && window.Lampa.Input.callback) {  
-                                window.Lampa.Input.callback(value);  
-                            } else {  
-                                // Запасной вариант - отправляем событие  
-                                window.Lampa.Listener.send('enter', {code: 13, enabled: true, value: value});  
-                                window.Lampa.Controller.enter();  
-                            }  
-                        }  
-                          
-                        console.log('Enter triggered with value:', input.val());  
-                    } catch (err) {  
-                        console.error('Lampa Plugin: Error in Enter click:', err);  
-                    }  
-                });  
+$buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {  
+    try {  
+        var input = $('.simple-keyboard-input');  
+          
+        if (input.length) {  
+            // Фокусируем поле ввода  
+            input.focus();  
+              
+            // Получаем значение  
+            var value = input.val();  
+              
+            // Находим экземпляр клавиатуры  
+            var keyboard = $('.simple-keyboard');  
+            var keyboardInstance = keyboard.data('keyboard');  
+              
+            if (keyboardInstance && keyboardInstance.listener) {  
+                // Отправляем событие через listener клавиатуры  
+                keyboardInstance.listener.send('enter', {code: 13, enabled: true, value: value});  
+            } else {  
+                // Запасной вариант - глобальная отправка  
+                window.Lampa.Listener.send('enter', {code: 13, enabled: true, value: value});  
+            }  
+              
+            // Вызываем обработчик Enter  
+            window.Lampa.Controller.enter();  
+        }  
+          
+        console.log('Enter triggered with value:', input.val());  
+    } catch (err) {  
+        console.error('Lampa Plugin: Error in Enter click:', err);  
+    }  
+});
   
                 // Обработчик кнопки "Отменить"  
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {  
