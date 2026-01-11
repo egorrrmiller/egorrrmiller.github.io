@@ -72,6 +72,7 @@
                         applyEpisodeData(seasonCache[cacheKey]);
                     } else {
                         Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                            console.log('tmdbData', tmdbData);
                             if (tmdbData && tmdbData.episodes) {
                                 seasonCache[cacheKey] = tmdbData.episodes;
                                 applyEpisodeData(tmdbData.episodes);
