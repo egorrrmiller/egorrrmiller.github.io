@@ -23,7 +23,7 @@
 
                 if (!movie || !movie.id || !data.title) return;
 
-                const match = data.title.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
+                const match = data.folder_name.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
                 console.log('match', match);
 
