@@ -1,8 +1,6 @@
 (function () {
     'use strict';
 
-    var _this = this;
-
     function injectCustomButtons() {
         // Ищем контейнер клавиатуры
         var keyboard = $('.simple-keyboard');
@@ -21,16 +19,10 @@
 
             // Обработчик кнопки "Готово"
             $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
-                var event = new KeyboardEvent('keydown', {
-                    key: 'Enter',
-                    code: 'Enter',
-                    keyCode: 13,
-                    which: 13,
-                    bubbles: true,
-                    cancelable: true
-                    });
+                var enter = $.Event('keydown');
+                    enter.which = 27;
 
-                input.dispatchEvent(event);
+                $(document).trigger(enter);
             });
 
             // Обработчик кнопки "Отменить"
