@@ -93,7 +93,7 @@
     // Инициализация плагина  
     function init() {
         Lampa.Listener.follow('torrent_file', (e) => {
-            console.info('e', e)
+            console.info('torrent_file', e)
 
             if (e.type === 'list_open') {
                 // Очистка кэша при открытии нового списка  
@@ -131,7 +131,8 @@
                     const seasonNum = data.season || 1;
                     const cacheKey = `${movie.id}_s${seasonNum}`;
 
-                    // Применяем данные если уже загружены  
+                    // Применяем данные если уже загружены
+                    console.info('season', seasonCache[cacheKey])
                     if (seasonCache[cacheKey]) {
                         applyEpisodeData(
                             item,
