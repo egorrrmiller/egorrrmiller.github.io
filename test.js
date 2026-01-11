@@ -71,23 +71,23 @@
                         data.fname = targetEpisode.name;
                         data.img = img;
                     }
+                }
 
-                    // Проверка кэша или запрос к API
-                    if (seasonCache[cacheKey]) {
-                        applyEpisodeData(seasonCache[cacheKey]);
-                    } else {
-                        Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
-                            if (tmdbData && (tmdbData.episodes_original)) {
-                                let eps = tmdbData.episodes_original;
-                                seasonCache[cacheKey] = eps;
-                                applyEpisodeData(eps);
+                // Проверка кэша или запрос к API
+                if (seasonCache[cacheKey]) {
+                    applyEpisodeData(seasonCache[cacheKey]);
+                } else {
+                    Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                        if (tmdbData && (tmdbData.episodes_original)) {
+                            let eps = tmdbData.episodes_original;
+                            seasonCache[cacheKey] = eps;
+                            applyEpisodeData(eps);
 
-                                console.log(tmdbData);
-                            }
-                        }, (error) => {
-                            console.error('TMDB API Error:', error);
-                        });
-                    }
+                            console.log(tmdbData);
+                        }
+                    }, (error) => {
+                        console.error('TMDB API Error:', error);
+                    });
                 }
             }
         });
