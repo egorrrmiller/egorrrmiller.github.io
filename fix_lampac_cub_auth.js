@@ -21,11 +21,16 @@
 
             // Обработчик кнопки "Готово"
             $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
-                input.blur();
+                var event = new KeyboardEvent('keydown', {
+                    key: 'Enter',
+                    code: 'Enter',
+                    keyCode: 13,
+                    which: 13,
+                    bubbles: true,
+                    cancelable: true
+                    });
 
-                _this.onEnter();
-
-                console.log('Lampa Plugin: Custom Enter Triggered');
+                input.dispatchEvent(event);
             });
 
             // Обработчик кнопки "Отменить"
