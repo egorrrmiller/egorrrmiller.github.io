@@ -1,90 +1,78 @@
 (function () {
     'use strict';
 
-    // Стили кнопок
     var css = `
         .keyboard-actions-footer {
             display: flex;
             justify-content: center;
-            align-items: center;
-            padding: 1.5em 0;
-            margin-top: 0.5em;
+            padding: 10px;
+            background: rgba(0,0,0,0.2);
         }
         .keyboard-actions-footer .simple-button {
-            margin: 0 1em;
-            min-width: 140px;
+            margin: 0 10px;
+            min-width: 150px;
             text-align: center;
         }
         .keyboard-actions-footer .selector.focus {
-            background-color: white !important;
-            color: black !important;
-            transform: scale(1.1);
+            background-color: #fff !important;
+            color: #000 !important;
         }
     `;
-    if (!$('style#kb-tweaks-style').length) {
-        $('head').append('<style id="kb-tweaks-style">' + css + '</style>');
-    }
+    if (!$('style#kb-tweaks-style').length) $('head').append('<style id="kb-tweaks-style">' + css + '</style>');
 
     function inject() {
         var keyboard = $('.simple-keyboard');
         if (keyboard.length && !keyboard.find('.keyboard-actions-footer').length) {
-
+            
             var $footer = $('<div class="keyboard-actions-footer"></div>');
-            var $btnEnter = $('<div class="simple-button selector" id="kb-btn-enter">Готово</div>');
-            var $btnCancel = $('<div class="simple-button selector" id="kb-btn-cancel">Отменить</div>');
+            var $btnEnter = $('<div class="simple-button selector">Готово</div>');
+            var $btnCancel = $('<div class="simple-button selector">Отменить</div>');
 
             $footer.append($btnEnter).append($btnCancel);
             keyboard.append($footer);
 
-            // Функция ввода Enter
-            var doEnter = function() {
-                var input = document.querySelector('.simple-keyboard-input') || document.querySelector('input:focus') || document.querySelector('input');
+            // Кнопка "Готово" - имитируем нажатие Enter на инпуте
+            $btnEnter.on('hover:enter', function() {
+                var input = document.querySelector('.simple-keyboard-input') || document.querySelector('input');
                 if (input) {
-                    var ev = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                    input.dispatchEvent(new KeyboardEvent('keydown', ev));
-                    // Эмуляция клика для некоторых типов полей
-                    $(input).trigger('enter'); 
+                    var event = new KeyboardEvent('keydown', {
+                        key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true
+                    });
+                    input.dispatchEvent(event);
                 }
-            };
-
-            $btnEnter.on('hover:enter click', doEnter);
-            $btnCancel.on('hover:enter click', function() {
-                if (window.Lampa && Lampa.Controller) Lampa.Controller.back();
             });
 
-            // КОНТРОЛЛЕР
+            // Кнопка "Отменить" - просто закрываем текущий контроллер (назад)
+            $btnCancel.on('hover:enter', function() {
+                Lampa.Controller.back();
+            });
+
             if (window.Lampa && Lampa.Controller) {
-                Lampa.Controller.add('keyboard_plugins_ctrl', {
+                // Регистрируем контроллер для блока кнопок
+                Lampa.Controller.add('keyboard_footer', {
                     toggle: function() {
+                        // Указываем набор элементов для навигации (как в модалке)
                         Lampa.Controller.collectionSet($footer);
                         Lampa.Controller.collectionFocus($btnEnter[0], $footer);
                     },
                     up: function() {
-                        // Возвращаемся в основную клавиатуру
+                        // Возврат к буквам клавиатуры
                         Lampa.Controller.toggle('keyboard');
-                        // Насильно ставим фокус на инпут, если он есть
-                        var input = document.querySelector('.simple-keyboard-input') || document.querySelector('input');
-                        if (input) input.focus();
-                    },
-                    left: function() {
-                        // Если мы на Отмене (вторая кнопка), идем на Готово (первая)
-                        Lampa.Controller.collectionFocus($btnEnter[0], $footer);
-                    },
-                    right: function() {
-                        // Если мы на Готово, идем на Отмену
-                        Lampa.Controller.collectionFocus($btnCancel[0], $footer);
                     },
                     back: function() {
+                        // Выход из клавиатуры совсем
                         Lampa.Controller.back();
                     }
+                    // Методы left/right удалены, Lampa сама найдет соседний .selector
                 });
 
-                // Глобальный перехват Down на инпуте
-                $(document).off('keydown.kb_plugin').on('keydown.kb_plugin', function(e) {
+                // Слушаем нажатие "Вниз" на клавиатуре, чтобы перейти к кнопкам
+                $(document).off('keydown.kb_nav').on('keydown.kb_nav', function(e) {
                     if (e.keyCode === 40) { // Down
                         var active = document.activeElement;
-                        if (active && active.tagName === 'INPUT') {
-                            Lampa.Controller.toggle('keyboard_plugins_ctrl');
+                        // Если мы на буквах или в инпуте - прыгаем вниз к нашим кнопкам
+                        if (active && (active.tagName === 'INPUT' || $(active).closest('.simple-keyboard__keys').length)) {
+                            Lampa.Controller.toggle('keyboard_footer');
                         }
                     }
                 });
@@ -92,7 +80,6 @@
         }
     }
 
-    // Наблюдатель
     var observer = new MutationObserver(function (mutations) {
         if ($('.simple-keyboard').length) inject();
     });
@@ -100,7 +87,7 @@
     function start() {
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
-            if ($('.simple-keyboard').length) inject();
+            inject();
         } else {
             setTimeout(start, 200);
         }
