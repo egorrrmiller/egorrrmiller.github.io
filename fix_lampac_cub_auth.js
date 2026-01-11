@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    var _this = this;
+
     function injectCustomButtons() {
         // Ищем контейнер клавиатуры
         var keyboard = $('.simple-keyboard');
@@ -21,7 +23,7 @@
             $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                 input.blur();
 
-                this.listener.send('enter');
+                _this.listener.send('enter');
 
                 console.log('Lampa Plugin: Custom Enter Triggered');
             });
