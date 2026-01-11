@@ -1,73 +1,81 @@
 (function () {
     'use strict';
 
-    function initCustomKeyboard() {
-        // Проверяем, что клавиатура отрисована
-        var keyboardWrap = $('.simple-keyboard');
+    function injectCustomButtons() {
+        // Ищем контейнер клавиатуры
+        var keyboard = $('.simple-keyboard');
         
-        // Если клавиатура есть, а наших кнопок или системных еще нет
-        if (keyboardWrap.length && !keyboardWrap.find('.simple-keyboard-buttons').length) {
+        // Если клавиатура на месте, а наших кнопок еще нет
+        if (keyboard.length && !keyboard.find('.my-custom-buttons').length) {
             
-            // Создаем блок кнопок (используем структуру Lampa)
-            var buttons = $('<div class="simple-keyboard-buttons plugin-added"><div class="simple-keyboard-buttons__enter selector">' + Lampa.Lang.translate('ready') + '</div><div class="simple-keyboard-buttons__cancel selector">' + Lampa.Lang.translate('cancel') + '</div></div>');
+            // Создаем блок кнопок. 
+            // Добавляем класс 'my-custom-buttons', чтобы не дублировать
+            var $buttons = $(
+                '<div class="simple-keyboard-buttons my-custom-buttons">' +
+                    '<div class="simple-keyboard-buttons__enter selector" style="pointer-events: all;">Готово</div>' +
+                    '<div class="simple-keyboard-buttons__cancel selector" style="pointer-events: all;">Отменить</div>' +
+                '</div>'
+            );
 
-            // Находим текущий активный объект ввода в Lampa
-            // Lampa.Input.active() - это ссылка на текущий экземпляр класса Input
-            var inputInstance = Lampa.Input.active ? Lampa.Input.active() : null;
-
-            // Обработка клика "Готово"
-            buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
-                var inputField = keyboardWrap.find('input');
-                inputField.blur(); // Убираем фокус с поля
-
-                if (inputInstance && inputInstance.listener) {
-                    inputInstance.listener.send('enter', { value: inputField.val() });
-                } else {
-                    // Резервный метод через эмуляцию клавиши
-                    var e = $.Event('keydown');
-                    e.which = 13;
-                    $(document).trigger(e);
-                }
-            });
-
-            // Обработка клика "Отменить"
-            buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                if (inputInstance && typeof inputInstance.value === 'function') {
-                    inputInstance.value(''); // Очищаем значение
-                }
+            // Обработчик кнопки "Готово"
+            $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
+                e.preventDefault();
                 
-                if (window.Lampa.Controller) {
-                    window.Lampa.Controller.back(); // Возвращаемся (закрываем клавиатуру)
+                var $input = keyboard.find('input');
+                
+                // 1. Убираем фокус, чтобы Lampa сохранила значение
+                $input.blur();
+
+                // 2. Эмулируем нажатие клавиши Enter
+                var event = $.Event('keydown');
+                event.which = 13;
+                event.keyCode = 13;
+                $(document).trigger(event);
+
+                console.log('Lampa Plugin: Custom Enter Triggered');
+            });
+
+            // Обработчик кнопки "Отменить"
+            $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {
+                e.preventDefault();
+                
+                // Используем встроенный контроллер Lampa для шага "Назад"
+                if (window.Lampa && window.Lampa.Controller) {
+                    window.Lampa.Controller.back();
+                } else {
+                    // Резервный вариант - клавиша ESC
+                    var event = $.Event('keydown');
+                    event.which = 27;
+                    $(document).trigger(event);
                 }
             });
 
-            // Добавляем кнопки в интерфейс
-            keyboardWrap.append(buttons);
+            // Добавляем кнопки в конец контейнера клавиатуры
+            keyboard.append($buttons);
 
-            // Сообщаем Lampa, что нужно обновить список активных элементов (для навигации пультом)
-            if (window.Lampa.Controller) {
+            // Оповещаем Lampa, что появились новые элементы .selector
+            if (window.Lampa && window.Lampa.Controller) {
                 window.Lampa.Controller.update();
             }
         }
     }
 
-    // Слушаем изменения в DOM, чтобы вовремя поймать создание клавиатуры
+    // Следим за появлением клавиатуры через MutationObserver
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (mutation.addedNodes.length) {
-                initCustomKeyboard();
+                injectCustomButtons();
             }
         });
     });
 
     function start() {
-        if (window.appready && window.Lampa) {
+        if (window.appready) {
             observer.observe(document.body, {
                 childList: true,
                 subtree: true
             });
-            // Проверка на случай, если клавиатура уже была открыта до старта плагина
-            initCustomKeyboard();
+            injectCustomButtons();
         } else {
             setTimeout(start, 200);
         }
