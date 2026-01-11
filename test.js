@@ -1,84 +1,87 @@
 (function () {
-    const originalModalOpen = Lampa.Modal.open;
+    let tmdb_cache = {};
 
-    // Перехватываем открытие любого модального окна
-    Lampa.Modal.open = function (params) {
-        // Если это окно со списком файлов (торренты)
-        if (params.title === Lampa.Lang.translate('torrent_serial_files') || params.title === 'Файлы') {
+    // 1. Слушаем событие рендера каждого файла в списке торрентов
+    Lampa.Listener.follow('torrent_file', (e) => {
+        if (e.type === 'render') {
+            const item = e.item; // jQuery элемент (.torrent-serial)
+            const data = e.element; // Данные файла (name, episode, season и т.д.)
+            
             const activity = Lampa.Activity.active();
+            if (!activity || !activity.card) return;
+
             const card = activity.card;
+            // Пытаемся определить номер эпизода из данных файла
+            const epNum = data.episode;
+            const seasonNum = data.season || 1;
 
-            // Если это сериал, будем перерисовывать
-            if (card && (card.number_of_seasons || card.name)) {
+            if (epNum) {
+                // Чтобы не перерисовывать многократно
+                if (item.attr('data-redrawn')) return;
                 
-                // Создаем наше кастомное наполнение
-                const customHtml = $(`<div class="torrent-files"><div class="loading" style="padding: 20px; text-align: center;">Загрузка данных из TMDB...</div></div>`);
-                
-                // Подменяем контент в параметрах модалки перед открытием
-                params.html = customHtml;
+                const cacheKey = `${card.id}_s${seasonNum}`;
 
-                // Вызываем оригинал, чтобы окно открылось, но уже с нашей "пустышкой"
-                originalModalOpen.call(Lampa.Modal, params);
-
-                // Начинаем магию отрисовки
-                renderCustomFiles(customHtml, card);
-                
-                return; // Выходим, чтобы не сработал дефолтный код
+                if (tmdb_cache[cacheKey]) {
+                    applyChanges(item, tmdb_cache[cacheKey], epNum, seasonNum);
+                } else {
+                    Lampa.TMDB.get(`tv/${card.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                        if (tmdbData && tmdbData.episodes) {
+                            tmdb_cache[cacheKey] = tmdbData.episodes;
+                            applyChanges(item, tmdb_cache[cacheKey], epNum, seasonNum);
+                        }
+                    });
+                }
             }
         }
+
+        // 2. Перехват выбора (Enter) — если нужно что-то менять при клике
+        if (e.type === 'onenter') {
+            console.log('Lampa Redraw: Запуск файла', e.element.name);
+            // Здесь можно добавить свою логику перед запуском плеера
+        }
+    });
+
+    function applyChanges(item, episodes, epNum, seasonNum) {
+        const epData = episodes.find(e => e.episode_number == epNum);
+        if (!epData) return;
+
+        item.attr('data-redrawn', 'true');
+
+        // Формируем новый внутренний HTML, идентичный структуре Lampa, но с нашими данными
+        const img = epData.still_path ? Lampa.TMDB.image(epData.still_path, 'w500') : './img/img_broken.svg';
+        const date = epData.air_date ? Lampa.Utils.parseDate(epData.air_date).format('DD MMMM YYYY') : '--';
+
+        // Полностью перерисовываем внутреннюю структуру .torrent-serial
+        item.html(`
+            <img src="${img}" class="torrent-serial__img loaded">
+            <div class="torrent-serial__content">
+                <div class="torrent-serial__body">
+                    <div class="torrent-serial__title">${epData.name}</div>
+                    <div class="torrent-serial__line">
+                        <span>Сезон - <b>${seasonNum}</b></span>
+                        <span>Выход - ${date}</span>
+                    </div>
+                </div>
+                <div class="torrent-serial__detail">
+                    <div class="torrent-serial__size">${item.find('.torrent-serial__size').text() || ''}</div>
+                    <div class="torrent-serial__exe">${item.find('.torrent-serial__exe').text() || ''}</div>
+                </div>
+                <div class="torrent-serial__clear"></div>
+            </div>
+            <div class="torrent-serial__episode">${epNum}</div>
+        `);
         
-        // Для всех остальных окон работаем как обычно
-        originalModalOpen.call(Lampa.Modal, params);
-    };
-
-    function renderCustomFiles(container, card) {
-        // Определяем сезон. Обычно берется из текущего контекста Lampa
-        // Если данных нет, по умолчанию 1
-        const seasonNum = card.season || 1;
-
-        Lampa.TMDB.get(`tv/${card.id}/season/${seasonNum}?language=ru-RU`, {}, (data) => {
-            container.empty(); // Убираем надпись "Загрузка"
-
-            if (data && data.episodes) {
-                data.episodes.forEach(ep => {
-                    const img = ep.still_path ? Lampa.TMDB.image(ep.still_path, 'w500') : './img/img_broken.svg';
-                    const date = ep.air_date ? Lampa.Utils.parseDate(ep.air_date).format('DD MMMM YYYY') : '--';
-
-                    const item = $(`
-                        <div class="torrent-serial selector layer--visible layer--render" data-episode="${ep.episode_number}">
-                            <img src="${img}" class="torrent-serial__img loaded">
-                            <div class="torrent-serial__content">
-                                <div class="torrent-serial__body">
-                                    <div class="torrent-serial__title">${ep.name}</div>
-                                    <div class="torrent-serial__line">
-                                        <span>Сезон - <b>${seasonNum}</b></span>
-                                        <span>Выход - ${date}</span>
-                                    </div>
-                                </div>
-                                <div class="torrent-serial__detail">
-                                    <div class="torrent-serial__size">TMDB Info</div>
-                                    <div class="torrent-serial__exe">EP ${ep.episode_number}</div>
-                                </div>
-                                <div class="torrent-serial__clear"></div>
-                            </div>
-                            <div class="torrent-serial__episode">${ep.episode_number}</div>
-                        </div>
-                    `);
-
-                    // Вешаем обработчик клика (здесь можно прописать запуск плеера)
-                    item.on('hover:enter', () => {
-                        Lampa.Noty.show('Запуск серии: ' + ep.name);
-                        // Тут должна быть логика поиска ссылки в оригинальных данных торрента
-                    });
-
-                    container.append(item);
-                });
-
-                // Обновляем контроллер, чтобы можно было перемещаться по списку пультом
-                Lampa.Controller.enable('modal');
+        // Добавляем таймлайн, если он был (прогресс просмотра)
+        if (item.data('hash')) {
+            const hash = item.data('hash');
+            const timeline = Lampa.Timeline.view(hash);
+            if (timeline && timeline.percent > 0) {
+                item.find('.torrent-serial__content').append(`
+                    <div class="time-line">
+                        <div style="width: ${timeline.percent}%"></div>
+                    </div>
+                `);
             }
-        }, () => {
-            container.html('<div style="padding: 20px;">Ошибка загрузки TMDB</div>');
-        });
+        }
     }
 })();
