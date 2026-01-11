@@ -4,7 +4,7 @@
     function injectCustomButtons() {
         try {
             // Ищем контейнер клавиатуры
-            var keyboard = $('.test-buttons');
+            var keyboard = $('.simple-keyboard');
             
             // Если клавиатура на месте, а наших кнопок еще нет
             if (keyboard.length) {
