@@ -125,7 +125,7 @@
                 const match = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
                 if (match) {
-                    const partNumber = parseInt(match[1]);
+                    const partNumber = data.episode;
                     const seasonNum = data.season || 1;
                     const cacheKey = `${movie.id}_s${seasonNum}`;
 
