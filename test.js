@@ -43,18 +43,10 @@
                 html.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
             }
 
-            let img;
-            if (targetEpisode.still_path) {
-                img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
-                console.info('img', img)
-
-                html.find('.torrent-serial__img').attr('src', img);
-            }
-
             // Обновление объекта данных (для плеера)
             data.title = targetEpisode.name;
             data.fname = targetEpisode.name;
-            data.img = img;
+            data.img = e.element.img;
         }
     }
 
