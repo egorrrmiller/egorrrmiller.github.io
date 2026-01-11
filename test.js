@@ -4,17 +4,16 @@
 * */
 
 (function () {
-    
+
     const regex = /(?:часть|part|pt?\.?)\s*(\d+)/i;
 
     const activity = Lampa.Activity.active();
 
     const card = activity.card;
-    
-    const episodes = card.episodes;
-    
-    console.log(episodes)
-    
+
+
+    console.log(card)
+
     Lampa.Listener.follow('torrent_file', (e) => {
 
         if (e.type === 'render'){
