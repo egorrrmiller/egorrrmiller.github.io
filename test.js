@@ -16,6 +16,8 @@
                 const item = e.item;
                 const data = e.element;
                 const movie = e.params.movie;
+                
+                console.log('movie', movie);
 
                 if (!movie || !movie.id || !data.title) return;
 
@@ -27,18 +29,18 @@
                     const cacheKey = `${movie.id}_s${seasonNum}`;
 
                     const applyEpisodeData = (episodes) => {
-                        // Вычисляем номер эпизода: общее кол-во - номер части  
+                        // Вычисляем номер эпизода: общее кол-во - номер части
                         const totalEpisodes = episodes.length;
                         const targetEpisodeNumber = totalEpisodes - partNumber;
-                        
+
                         console.log('totalEpisodes', totalEpisodes);
                         console.log('partNumber', partNumber);
 
-                        // Ищем эпизод с вычисленным номером  
+                        // Ищем эпизод с вычисленным номером
                         const targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
 
                         if (targetEpisode) {
-                            // Обновляем DOM  
+                            // Обновляем DOM
                             item.find('.torrent-serial__title').text(targetEpisode.name);
 
                             if (targetEpisode.air_date) {
@@ -51,7 +53,7 @@
                                 item.find('.torrent-serial__img').attr('src', img);
                             }
 
-                            // Обновляем данные  
+                            // Обновляем данные
                             data.title = targetEpisode.name;
                             data.fname = targetEpisode.name;
                             data.air_date = targetEpisode.air_date;
