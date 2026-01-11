@@ -4,53 +4,49 @@
     function inject() {
         var keyboard = $('.simple-keyboard');
         
-        // Если клавиатура есть в DOM
-        if (keyboard.length) {
-            // Если кнопки уже добавлены, ничего не делаем
-            if (keyboard.find('.simple-keyboard-buttons').length) return;
-
-            // Пробуем получить объект ввода
-            var _this = Lampa.Input.active ? Lampa.Input.active() : null;
-
-            // Если объект еще не готов — ждем 50мс и пробуем снова (цикл до победного)
-            if (!_this || !_this.listener) {
-                setTimeout(inject, 50);
-                return;
-            }
-
-            var input = keyboard.find('#orsay-keyboard');
+        // Если клавиатура есть, а наших кнопок еще нет
+        if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
+            
+            // 1. Создаем кнопки (твой код)
             var Lang = Lampa.Lang;
-            var Controller = Lampa.Controller;
-
-            // --- ТВОЙ КОД (CTRL+C / CTRL+V) ---
             var buttons = $('<div class="simple-keyboard-buttons"><div class="simple-keyboard-buttons__enter">' + Lang.translate('ready') + '</div><div class="simple-keyboard-buttons__cancel">' + Lang.translate('cancel') + '</div></div>');
             
+            // 2. Вешаем обработчики, которые найдут _this и input прямо в секунду нажатия
             buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
-                input.blur();
-
-                _this.listener.send('enter');
+                var _this = Lampa.Input.active();
+                var input = $('.simple-keyboard').find('#orsay-keyboard');
+                
+                if (_this && _this.listener) {
+                    input.blur();
+                    _this.listener.send('enter');
+                }
             });
             
             buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                _this.value('');
-
-                Controller.back();
+                var _this = Lampa.Input.active();
+                if (_this) {
+                    _this.value('');
+                    Lampa.Controller.back();
+                }
             });
 
+            // 3. Вставляем кнопки
             keyboard.append(buttons);
-            // --- КОНЕЦ ТВОЕГО КОДА ---
 
-            // Добавляем селекторы для управления
+            // 4. Добавляем селекторы для управления
             buttons.find('div').addClass('selector');
-            if (Controller.update) Controller.update();
+            
+            if (Lampa.Controller.update) {
+                Lampa.Controller.update();
+            }
         }
     }
 
-    // Следим за DOM
+    // Следим за появлением элементов
     var observer = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes.length) inject();
-        }
+        mutations.forEach(function (mutation) {
+            if (mutation.addedNodes.length) inject();
+        });
     });
 
     function start() {
