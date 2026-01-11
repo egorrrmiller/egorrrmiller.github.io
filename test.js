@@ -4,7 +4,7 @@
     }
 
     try {
-        const seasonCache = {};
+        let seasonCache = {};
 
         // сюда попадем столько раз, сколько файлов в торренте
         Lampa.Listener.follow('torrent_file', (e) => {
@@ -30,7 +30,7 @@
                     const totalInTorrent = allFilesCount.length;
                     const totalInTMDB = episodes.length;
 
-                    const targetEpisodeNumber = episode;
+                    let targetEpisodeNumber = episode;
 
                     const fileName = data.folder_name || data.path;
                     const checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
@@ -57,7 +57,7 @@
                             html.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
                         }
 
-                        const img;
+                        let img;
                         if (targetEpisode.still_path) {
                             img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
                             console.info('img', img)
