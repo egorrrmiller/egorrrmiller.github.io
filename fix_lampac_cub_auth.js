@@ -14,7 +14,7 @@
                     '</div>'
                 );
 
-                // Функция для имитации Enter (твой рабочий метод)
+                // Твой рабочий метод для браузера/ПК
                 var triggerEnter = function() {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
@@ -26,36 +26,50 @@
                         document.dispatchEvent(down);
                         input.dispatchEvent(up);
                         document.dispatchEvent(up);
+                        console.log('Lampa Plugin: Native Enter Triggered');
                     }
                 };
 
-                // Применяем логику нажатий как в select_weapon (через hover:enter и click)
-                $buttons.find('.simple-keyboard-buttons__enter').on('hover:enter', function() {
-                    triggerEnter();
-                }).on('click', function(e) {
-                    if (Lampa.DeviceInput.canClick(e.originalEvent)) triggerEnter();
-                });
+                // Универсальный обработчик (Пульт + Мышь)
+                var bindEvents = function(el, action) {
+                    el.on('hover:enter', function() {
+                        action();
+                    }).on('click', function(e) {
+                        // canClick проверяет, было ли это реальное нажатие (из кода weapon)
+                        if (window.Lampa && Lampa.DeviceInput && Lampa.DeviceInput.canClick(e.originalEvent)) {
+                            action();
+                        } else if (!window.Lampa || !Lampa.DeviceInput) {
+                            action(); // Для обычного браузера
+                        }
+                    });
+                };
 
-                $buttons.find('.simple-keyboard-buttons__cancel').on('hover:enter', function() {
+                bindEvents($buttons.find('.simple-keyboard-buttons__enter'), triggerEnter);
+                bindEvents($buttons.find('.simple-keyboard-buttons__cancel'), function() {
                     if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
-                }).on('click', function(e) {
-                    if (Lampa.DeviceInput.canClick(e.originalEvent)) window.Lampa.Controller.back();
                 });
 
-                // Добавляем кнопки
+                // Вставляем кнопки
                 keyboard.append($buttons);
 
-                // ОБНОВЛЕНИЕ НАВИГАЦИИ (метод из select_weapon)
+                // ЛОГИКА ДЛЯ ТВ
                 if (window.Lampa && window.Lampa.Controller) {
-                    // Даем контроллеру понять, что список селекторов изменился
-                    window.Lampa.Controller.update();
-                    
-                    // Если мы уже в слое клавиатуры, заставляем его пересчитать коллекцию
-                    var current = window.Lampa.Controller.enabled();
-                    if (current && current.name === 'keyboard') {
-                        // В Lampa коллекция обновляется через обращение к контейнеру
-                        Lampa.Controller.collectionSet(keyboard);
-                    }
+                    // Даем небольшую задержку, чтобы DOM обновился
+                    setTimeout(function() {
+                        var current = Lampa.Controller.enabled();
+                        
+                        // Если мы на ТВ или в слое клавиатуры
+                        if (current && current.name === 'keyboard') {
+                            // Принудительно обновляем коллекцию элементов, чтобы пульт их "увидел"
+                            // Передаем весь контейнер клавиатуры, чтобы Lampa пересканировала все .selector
+                            Lampa.Controller.collectionSet(keyboard);
+                            
+                            // Вызываем обновление навигации
+                            Lampa.Controller.update();
+                            
+                            console.log('Lampa Plugin: Controller collection updated for TV');
+                        }
+                    }, 100);
                 }
             }
         } catch (globalErr) {
@@ -70,6 +84,7 @@
     });
 
     function start() {
+        // Проверяем appready и наличие Lampa
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
             injectCustomButtons();
