@@ -17,12 +17,14 @@
                 const data = e.element;
                 const movie = e.params.movie;
 
+                console.log('item', item);
+                console.log('data', data);
                 console.log('movie', movie);
 
-                //if (!movie || !movie.id || !data.title) return;
+                if (!movie || !movie.id || !data.title) return;
 
                 const match = data.title.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
-                
+
                 console.log('match', match);
 
                 if (match) {
