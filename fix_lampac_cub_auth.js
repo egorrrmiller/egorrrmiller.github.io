@@ -1,8 +1,8 @@
 (function () {
     'use strict';
 
+    // Стили для фокуса с пульта
     var style = $('<style>' +
-        '.simple-keyboard-buttons .selector { cursor: pointer; transition: all 0.2s; border-radius: 4px; padding: 10px; margin: 5px; text-align: center; background: rgba(255, 255, 255, 0.05); }' +
         '.simple-keyboard-buttons .selector.focus { background: rgba(255, 255, 255, 0.2) !important; border: 1px solid #fff; }' +
     '</style>');
     $('head').append(style);
@@ -12,6 +12,7 @@
             var keyboard = $('.simple-keyboard');
             
             if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
+                
                 var $buttons = $(
                     '<div class="simple-keyboard-buttons">' +
                         '<div class="simple-keyboard-buttons__enter selector" nav-selectable="true">Готово</div>' +
@@ -19,43 +20,45 @@
                     '</div>'
                 );
 
+                // Твой рабочий метод прожатия Enter
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
                         input.blur();
                         var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                        input.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-                        input.dispatchEvent(new KeyboardEvent('keyup', eventParams));
-                        document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
+                        var down = new KeyboardEvent('keydown', eventParams);
+                        var up = new KeyboardEvent('keyup', eventParams);
+                        input.dispatchEvent(down);
+                        document.dispatchEvent(down);
+                        input.dispatchEvent(up);
+                        document.dispatchEvent(up);
                     }
                 });
 
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                    if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
+                    if (window.Lampa && window.Lampa.Controller) {
+                        window.Lampa.Controller.back();
+                    }
                 });
 
+                // Вставляем кнопки
                 keyboard.append($buttons);
 
-                // Регистрация для пульта
+                // РЕГИСТРАЦИЯ ДЛЯ ПУЛЬТА (как в select_weapon, но без создания нового слоя)
                 if (window.Lampa && window.Lampa.Controller) {
-                    setTimeout(function() {
-                        try {
-                            // Просто обновляем контроллер, чтобы он увидел новые .selector
-                            window.Lampa.Controller.update();
-                            
-                            // Принудительно заставляем систему "увидеть" новые элементы в текущем слое
-                            var active = window.Lampa.Controller.enabled();
-                            if (active && active.render) {
-                                active.render(); 
-                            }
-                        } catch (e) {
-                            console.log('Lampa Plugin: Controller update silent fail');
-                        }
-                    }, 150);
+                    var controller = window.Lampa.Controller.enabled();
+                    
+                    if (controller && controller.name === 'keyboard') {
+                        // Добавляем наши кнопки в текущую коллекцию элементов контроллера
+                        controller.collection = keyboard.find('.selector');
+                        
+                        // Пересчитываем навигацию
+                        window.Lampa.Controller.update();
+                    }
                 }
             }
         } catch (globalErr) {
-            console.error('Lampa Plugin Critical Error:', globalErr);
+            console.error('Lampa Plugin Error:', globalErr);
         }
     }
 
