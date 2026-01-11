@@ -1,106 +1,75 @@
-(function(){
-    const API_KEY = 'YOUR_TMDB_KEY';
-    let tmdbCache = null;
+(function() {
+    const TMDB_API_KEY = 'YOUR_TMDB_API_KEY'; // <--- вставь свой API ключ
 
-    let attempts = 0;
-    const MAX_ATTEMPTS = 20;
+    // Простое кэширование
+    const cache = {};
 
-    function log(...a){ console.log('[TMDB FILE PATCH]', ...a); }
+    // Функция получения данных с TMDB
+    async function fetchTMDB(title, season, episode) {
+        const cacheKey = `${title}_S${season}E${episode}`;
+        if (cache[cacheKey]) return cache[cacheKey];
 
-    function waitForTorrentFiles(){
-        const box = document.querySelector('.torrent-files');
-        if(box){
-            log('torrent-files найден, запускаю патчинг…');
-            startPatchingLoop();
-        } else {
-            setTimeout(waitForTorrentFiles, 300);
+        try {
+            // Поиск сериала
+            let res = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
+            let data = await res.json();
+            if (!data.results || data.results.length === 0) return null;
+
+            const tv = data.results[0];
+
+            // Получение данных конкретного эпизода
+            res = await fetch(`https://api.themoviedb.org/3/tv/${tv.id}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`);
+            const ep = await res.json();
+
+            const info = {
+                name: ep.name || `Episode ${episode}`,
+                air_date: ep.air_date || '--',
+                image: ep.still_path ? `https://image.tmdb.org/t/p/w500${ep.still_path}` : null
+            };
+
+            cache[cacheKey] = info;
+            return info;
+        } catch (e) {
+            console.error('TMDB fetch error:', e);
+            return null;
         }
     }
 
-    function startPatchingLoop(){
-        patchOnce();
-        attempts++;
+    // Функция перерисовки блока torrent-files
+    async function redrawTorrentFiles() {
+        const container = document.querySelector('.torrent-files');
+        if (!container) return;
 
-        if(attempts < MAX_ATTEMPTS){
-            setTimeout(startPatchingLoop, 500);
-        } else {
-            log('Патч остановлен по лимиту попыток');
+        const episodes = container.querySelectorAll('.torrent-serial');
+        for (let epDiv of episodes) {
+            const titleDiv = epDiv.querySelector('.torrent-serial__title');
+            const seasonSpan = epDiv.querySelector('.torrent-serial__line span b');
+            const episodeNumDiv = epDiv.querySelector('.torrent-serial__episode');
+
+            const title = titleDiv ? titleDiv.innerText : '';
+            const season = seasonSpan ? parseInt(seasonSpan.innerText) : 1;
+            const episodeNum = episodeNumDiv ? parseInt(episodeNumDiv.innerText) : 1;
+
+            const tmdbData = await fetchTMDB(title, season, episodeNum);
+            if (!tmdbData) continue;
+
+            // Обновляем название и дату
+            if (titleDiv) titleDiv.innerText = tmdbData.name;
+            const lineSpans = epDiv.querySelectorAll('.torrent-serial__line span');
+            if (lineSpans[1]) lineSpans[1].innerText = `Выход - ${tmdbData.air_date}`;
+
+            // Обновляем изображение
+            const img = epDiv.querySelector('img.torrent-serial__img');
+            if (img && tmdbData.image) img.src = tmdbData.image;
         }
     }
 
-    function getEpisodeNumber(card){
-        const ep = card.querySelector('.torrent-serial__episode');
-        if(!ep) return null;
-        const n = parseInt(ep.textContent.trim(), 10);
-        return Number.isInteger(n) ? n : null;
-    }
-
-    function disableDefaultImg(img){
-        img.removeAttribute('data-src');
-        img.classList.remove('lazyload');
-        img.src = ''; // убить автозагрузку
-    }
-
-    function applyEpisode(card, episode){
-        const title = card.querySelector('.torrent-serial__title');
-        const date = card.querySelector('.torrent-serial__line span:nth-child(2)');
-        const img = card.querySelector('img');
-
-        if(title && episode.name) title.textContent = episode.name;
-        if(date && episode.air_date) date.textContent = 'Выход - ' + episode.air_date;
-
-        if(img){
-            disableDefaultImg(img);
-
-            img.src = episode.still_path
-                ? 'https://image.tmdb.org/t/p/w500' + episode.still_path
-                : 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';
+    // Проверка наличия .torrent-files каждые 500ms
+    const interval = setInterval(() => {
+        const container = document.querySelector('.torrent-files');
+        if (container) {
+            clearInterval(interval);
+            redrawTorrentFiles();
         }
-    }
-
-    async function loadTMDB(){
-        if(tmdbCache) return tmdbCache;
-
-        const id = Lampa?.Activity?.activity?.tmdb_id;
-        if(!id){
-            log('Нет TMDB ID');
-            tmdbCache = [];
-            return tmdbCache;
-        }
-
-        const url = `https://api.themoviedb.org/3/tv/${id}/season/1?api_key=${API_KEY}&language=ru-RU`;
-        const res = await fetch(url);
-        const json = await res.json();
-        tmdbCache = json?.episodes || [];
-        log('TMDB эпизодов:', tmdbCache.length);
-
-        return tmdbCache;
-    }
-
-    async function patchOnce(){
-        const box = document.querySelector('.torrent-files');
-        if(!box){
-            log('torrent-files пропал?');
-            return;
-        }
-
-        const cards = box.querySelectorAll('.torrent-serial.selector');
-        if(!cards.length){
-            log('нет карточек эпизодов');
-            return;
-        }
-
-        const episodes = await loadTMDB();
-
-        cards.forEach(card => {
-            const epNum = getEpisodeNumber(card);
-            if(!epNum) return;
-            const ep = episodes.find(e=>e.episode_number === epNum);
-            if(ep) applyEpisode(card, ep);
-        });
-
-        log('Патч шаг:', attempts);
-    }
-
-    waitForTorrentFiles();
+    }, 500);
 })();
