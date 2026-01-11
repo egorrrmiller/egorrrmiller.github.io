@@ -18,37 +18,65 @@
                 );  
   
                 // Обработчик кнопки "Готово"  
-$buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {  
-    try {  
-        var input = $('.simple-keyboard-input');  
-          
-        if (input.length) {  
-            // Фокусируем поле ввода  
-            input.focus();  
-              
-            // Создаем и отправляем событие на поле ввода  
-            var enterEvent = $.Event('keyup');  
-            enterEvent.which = 13;  
-            enterEvent.keyCode = 13;  
-            enterEvent.preventDefault = function() { return false; };  
-              
-            input.trigger(enterEvent);  
-            window.Lampa.Controller.enter();  
-            console.log('Enter triggered on input'); 
-        }  
-          
-         
-    } catch (err) {  
-        console.error('Lampa Plugin: Error in Enter click:', err);  
-    }  
-});
+                $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {  
+                    try {  
+                        var input = $('.simple-keyboard-input');  
+                          
+                        if (input.length) {  
+                            // Фокусируем поле ввода  
+                            input.focus();  
+                            var value = input.val();  
+                              
+                            // Метод 1: Ищем и нажимаем стандартную кнопку Enter  
+                            var standardEnter = $('.simple-keyboard__button--enter, .hg-button[data-skbtn="{ENTER}"]');  
+                            if (standardEnter.length) {  
+                                standardEnter.trigger('click');  
+                                console.log('Enter triggered via standard button');  
+                                return;  
+                            }  
+                              
+                            // Метод 2: Ищем экземпляр клавиатуры и используем его listener  
+                            var keyboardData = keyboard.data();  
+                            if (keyboardData && keyboardData.listener) {  
+                                keyboardData.listener.send('enter', {  
+                                    code: 13,   
+                                    enabled: true,   
+                                    value: value,  
+                                    fromCustomButton: true  
+                                });  
+                                console.log('Enter sent via keyboard listener');  
+                            }  
+                              
+                            // Метод 3: Глобальная отправка события  
+                            window.Lampa.Listener.send('enter', {  
+                                code: 13,   
+                                enabled: true,   
+                                value: value,  
+                                fromCustomButton: true  
+                            });  
+                              
+                            // Метод 4: Вызываем Controller.enter()  
+                            window.Lampa.Controller.enter();  
+                              
+                            console.log('Enter triggered with value:', value);  
+                        }  
+                    } catch (err) {  
+                        console.error('Lampa Plugin: Error in Enter click:', err);  
+                    }  
+                });  
   
                 // Обработчик кнопки "Отменить"  
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {  
                     try {  
                         e.preventDefault();  
-                          window.Lampa.Controller.back();  
-                        
+                          
+                        if (window.Lampa && window.Lampa.Controller) {  
+                            window.Lampa.Controller.back();  
+                        } else {  
+                            var event = $.Event('keydown');  
+                            event.which = 27; // Esc  
+                            $(document).trigger(event);  
+                        }  
                     } catch (err) {  
                         console.error('Lampa Plugin: Error in Cancel click:', err);  
                     }  
@@ -57,7 +85,7 @@ $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                 // Добавляем кнопки  
                 keyboard.append($buttons);  
   
-                // Обновляем контроллер  
+                // Обновляем контроллер для навигации  
                 if (window.Lampa && window.Lampa.Controller && window.Lampa.Controller.update) {  
                     window.Lampa.Controller.update();  
                 }  
