@@ -14,79 +14,84 @@
                     '</div>'
                 );
 
-                // Твой рабочий метод для браузера/ПК
                 var triggerEnter = function() {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
                         input.blur();
                         var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                        var down = new KeyboardEvent('keydown', eventParams);
-                        var up = new KeyboardEvent('keyup', eventParams);
-                        input.dispatchEvent(down);
-                        document.dispatchEvent(down);
-                        input.dispatchEvent(up);
-                        document.dispatchEvent(up);
-                        console.log('Lampa Plugin: Native Enter Triggered');
+                        input.dispatchEvent(new KeyboardEvent('keydown', eventParams));
+                        input.dispatchEvent(new KeyboardEvent('keyup', eventParams));
+                        document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
                     }
                 };
 
-                // Универсальный обработчик (Пульт + Мышь)
-                var bindEvents = function(el, action) {
-                    el.on('hover:enter', function() {
-                        action();
-                    }).on('click', function(e) {
-                        // canClick проверяет, было ли это реальное нажатие (из кода weapon)
-                        if (window.Lampa && Lampa.DeviceInput && Lampa.DeviceInput.canClick(e.originalEvent)) {
-                            action();
-                        } else if (!window.Lampa || !Lampa.DeviceInput) {
-                            action(); // Для обычного браузера
-                        }
-                    });
-                };
-
-                bindEvents($buttons.find('.simple-keyboard-buttons__enter'), triggerEnter);
-                bindEvents($buttons.find('.simple-keyboard-buttons__cancel'), function() {
-                    if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
+                // Логика нажатий (Пульт + Мышь)
+                $buttons.find('.selector').on('hover:enter click', function(e) {
+                    if (e.type === 'click' && window.Lampa && Lampa.DeviceInput && !Lampa.DeviceInput.canClick(e.originalEvent)) return;
+                    
+                    if ($(this).hasClass('simple-keyboard-buttons__enter')) triggerEnter();
+                    else Lampa.Controller.back();
                 });
 
-                // Вставляем кнопки
                 keyboard.append($buttons);
 
-                // ЛОГИКА ДЛЯ ТВ
+                // --- АДАПТАЦИЯ НАВИГАЦИИ (МЕТОД SELECT_WEAPON) ---
                 if (window.Lampa && window.Lampa.Controller) {
-                    // Даем небольшую задержку, чтобы DOM обновился
-                    setTimeout(function() {
-                        var current = Lampa.Controller.enabled();
-                        
-                        // Если мы на ТВ или в слое клавиатуры
-                        if (current && current.name === 'keyboard') {
-                            // Принудительно обновляем коллекцию элементов, чтобы пульт их "увидел"
-                            // Передаем весь контейнер клавиатуры, чтобы Lampa пересканировала все .selector
+                    // Создаем отдельный микро-контроллер для наших кнопок
+                    Lampa.Controller.add('keyboard_custom_nav', {
+                        toggle: function () {
+                            // Фокусируемся на первой кнопке ("Готово")
                             Lampa.Controller.collectionSet(keyboard);
-                            
-                            // Вызываем обновление навигации
-                            Lampa.Controller.update();
-                            
-                            console.log('Lampa Plugin: Controller collection updated for TV');
+                            Lampa.Controller.collectionFocus($buttons.find('.simple-keyboard-buttons__enter')[0], keyboard);
+                        },
+                        left: function () {
+                            Lampa.Navigator.move('left');
+                        },
+                        right: function () {
+                            Lampa.Navigator.move('right');
+                        },
+                        up: function () {
+                            // При нажатии "Вверх" возвращаемся в основную клавиатуру
+                            Lampa.Controller.toggle('keyboard');
+                        },
+                        down: function () {
+                            // Внизу ничего нет
+                        },
+                        back: function () {
+                            Lampa.Controller.back();
                         }
-                    }, 100);
+                    });
+
+                    // Слушаем, когда фокус уходит вниз с основной клавиатуры
+                    // Мы подменяем стандартный контроллер, когда нужно
+                    window.Lampa.Controller.update();
                 }
             }
         } catch (globalErr) {
-            console.error('Lampa Plugin: Critical Error:', globalErr);
+            console.error('Lampa Plugin Error:', globalErr);
         }
     }
 
+    // Следим за появлением клавиатуры
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
-            if (mutation.addedNodes.length) injectCustomButtons();
+            if (mutation.addedNodes.length) {
+                injectCustomButtons();
+            }
         });
     });
 
     function start() {
-        // Проверяем appready и наличие Lampa
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
+            
+            // Хак: слушаем событие открытия клавиатуры, чтобы помочь навигации
+            Lampa.Listener.follow('app', function (e) {
+                if (e.type === 'keyboard_open') {
+                    setTimeout(injectCustomButtons, 100);
+                }
+            });
+            
             injectCustomButtons();
         } else {
             setTimeout(start, 200);
