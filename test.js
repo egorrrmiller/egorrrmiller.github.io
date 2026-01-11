@@ -12,16 +12,13 @@
 
                 let html = e.item;
                 let data = e.element;
-                let episode = data.episode; // каждый раз разный эпизод.
-
-                let allFilesCount = e.items;
                 let movie = e.params.movie;
 
-                /*
-                * 
-                *
-                *
-                * */
+                let episode = data.episode; // каждый раз разный эпизод.
+                let seasonNum = data.season || 1;
+                let cacheKey = `${movie.id}_s${seasonNum}`;
+
+                let allFilesCount = e.items;
 
                 if (!movie || !movie.id || !data.title || !allFilesCount) return;
 
@@ -30,9 +27,6 @@
                 console.log('checkPart', checkPart);
 
                 if (checkPart) {
-                    let partNumber = parseInt(checkPart[1]);
-                    let seasonNum = data.season || 1;
-                    let cacheKey = `${movie.id}_s${seasonNum}`;
 
                     let applyEpisodeData = (episodes) => {
                         console.log('episodes', episodes);
@@ -47,7 +41,7 @@
                         let offset = Math.max(0, totalInTMDB - totalInTorrent);
                         console.log('offset', offset);
 
-                        let targetEpisodeNumber = offset + partNumber;
+                        let targetEpisodeNumber = offset + episode;
                         console.log('targetEpisodeNumber', targetEpisodeNumber);
 
                         let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
@@ -77,7 +71,6 @@
                     // Проверка кэша или запрос к API
                     if (seasonCache[cacheKey]) {
                         applyEpisodeData(seasonCache[cacheKey]);
-                        console.log('cache', seasonCache[cacheKey]);
                     } else {
                         Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
                             if (tmdbData && (tmdbData.episodes_original)) {
