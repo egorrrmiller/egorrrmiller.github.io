@@ -16,6 +16,7 @@
         const totalInTMDB = episodes.length;
 
         let targetEpisodeNumber = episode;
+        console.log('targetEpisodeNumber', targetEpisodeNumber);
 
         const fileName = data.folder_name || data.path;
         const checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
@@ -32,7 +33,7 @@
         }
 
         const targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
-
+        
         if (targetEpisode) {
             // Обновление UI
             html.find('.torrent-serial__title').text(targetEpisode.name);
