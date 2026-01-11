@@ -50,6 +50,8 @@
             if (e.type === 'list_open') {
                 seasonCache = {};
             } else if (e.type === 'render') {
+                console.log('e', e)
+                
                 let data = e.element;
                 let seasonNum = data.season || 1;
                 let movie = e.params.movie;
@@ -63,6 +65,8 @@
                         if (tmdbData && tmdbData.episodes_original) {
                             seasonCache[data.folder_name] = tmdbData.episodes_original;
                             episodes = tmdbData.episodes_original;
+                            
+                            console.log('tmdbData', episodes);
                         }
                     }, (error) => {
                         console.error('API error:', error);
