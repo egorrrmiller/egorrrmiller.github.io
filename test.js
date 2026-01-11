@@ -1,244 +1,91 @@
-(function () {
-	"use strict";
+(function(){
+    const TMDB_KEY = '4ef0d7355d9ffb5151e987764708ce96';
 
-	var SEASON_FIX = {
-		id: "season_fix",
-		version: "1.0",
-		gap: 90,
+    function log(...m){ console.log('[TMDB-Torrent]', ...m); }
 
-		dateToDays: function (dateStr) {
-			if (!dateStr || typeof dateStr !== "string") return 0;
-			var parts = dateStr.split("-");
-			if (parts.length !== 3) return 0;
+    function extractEpisode(name){
+        name = name.toLowerCase();
 
-			var y = parseInt(parts[0], 10);
-			var m = parseInt(parts[1], 10);
-			var d = parseInt(parts[2], 10);
+        let m;
+        if(m = name.match(/s(\d+)[ ._-]?e(\d+)/)) return {season:+m[1], episode:+m[2]};
+        if(m = name.match(/(\d+)x(\d+)/)) return {season:+m[1], episode:+m[2]};
+        if(m = name.match(/(?:ep|e)(\d{1,3})/)) return {season:null, episode:+m[1]};
+        if(m = name.match(/[^0-9](\d{1,3})(?:[^0-9]|$)/)) return {season:null, episode:+m[1]};
+        return {season:null, episode:null};
+    }
 
-			return y * 365 + m * 30 + d;
-		},
+    async function loadTMDB(tv_id, season){
+        const url = `https://apitmdb.mirror-kurwa.men/3/tv/${tv_id}/season/${season}?api_key=${TMDB_KEY}&language=ru-RU`;
+        try{
+            const res = await fetch(url);
+            const data = await res.json();
+            return data.episodes || [];
+        }catch(e){
+            log('TMDB error', e);
+            return [];
+        }
+    }
 
-		init: function () {
-			this.hook();
-		},
+    function patchCards(files, tmdbEpisodes){
+        files.forEach(function(node){
+            const card = $(node);
+            const fileName = card.find('.torrent-serial__title').text() || '';
+            const found = extractEpisode(fileName);
 
-		hook: function () {
-			var _this = this;
-			if (!window.$ || !window.$.ajax) {
-				return setTimeout(function () {
-					_this.hook();
-				}, 200);
-			}
+            let episode;
+            if(found.episode){
+                episode = tmdbEpisodes.find(e=>e.episode_number === found.episode);
+            }
 
-			var originalAjax = window.$.ajax;
+            if(!episode) return;
 
-			window.$.ajax = function (url, options) {
-				var settings = (typeof url === "object" ? url : options) || {};
-				var reqUrl = (typeof url === "string" ? url : settings.url) || "";
+            // Подмена заголовка
+            card.find('.torrent-serial__title').text(episode.name || fileName);
 
-				var match = reqUrl.match(/\/tv\/(\d+)\/season\/(\d+)/);
+            // Дата выхода
+            if(episode.air_date){
+                card.find('.torrent-serial__line span:nth-child(2)')
+                    .text('Выход - ' + episode.air_date);
+            }
 
-				if (match) {
-					var tvId = match[1];
-					var season = parseInt(match[2], 10);
+            // Заменить постер
+            if(episode.still_path){
+                card.find('img').attr('src', 'https://image.tmdb.org/t/p/w500' + episode.still_path);
+            }
 
-					var successCallback = settings.success;
-					var errorCallback = settings.error;
-					var completeCallback = settings.complete;
+            // Можно добавить описание (подсказкой)
+            card.attr('title', (episode.overview || '').trim());
+        });
+    }
 
-					var deferred = $.Deferred();
-					var promise = deferred.promise();
-					promise.abort = function () {};
+    Lampa.Listener.follow('torrent:files', async function(ev){
+        const data = ev.data;
+        if(!data || !data.torrent) return;
 
-					var runSmartFix = function () {
-						var s1Url = reqUrl.replace(/\/season\/\d+/, "/season/1");
+        const activity = Lampa.Activity.active();
+        if(!activity || !activity.source) return;
 
-						originalAjax({
-							url: s1Url,
-							type: "GET",
-							dataType: "json",
-							success: function (data) {
-								try {
-									var fixedData = _this.process(data, season, tvId);
+        const movie = activity.source;
+        const tv_id = movie.tmdb_id || movie.id;
+        const season = movie.season_number || movie.season || 1;
 
-									var fakeXHR = {
-										responseText: JSON.stringify(fixedData),
-										responseJSON: fixedData,
-										status: 200,
-										statusText: "OK",
-										readyState: 4,
-									};
+        log('Detected TV id=', tv_id, 'Season=', season);
 
-									if (successCallback) successCallback(fixedData, "success", fakeXHR);
-									if (completeCallback) completeCallback(fakeXHR, "success");
-									deferred.resolve(fixedData, "success", fakeXHR);
-								} catch (e) {
-									if (successCallback) successCallback(data, "success", { status: 200 });
-									deferred.resolve(data, "success", { status: 200 });
-								}
-							},
-							error: function (xhr, st, err) {
-								if (season > 1) {
-									var stubs = _this.makeStubs(tvId, season);
-									if (successCallback) successCallback(stubs, "success", { status: 200 });
-									deferred.resolve(stubs, "success", { status: 200 });
-								} else {
-									if (errorCallback) errorCallback(xhr, st, err);
-									deferred.reject(xhr, st, err);
-								}
-							},
-						});
-					};
+        const tmdbEpisodes = await loadTMDB(tv_id, season);
+        if(!tmdbEpisodes.length){
+            log('No TMDB episode data');
+            return;
+        }
 
-					originalAjax({
-						url: reqUrl,
-						type: "GET",
-						dataType: "json",
-						success: function (data, textStatus, xhr) {
-							if (data && data.episodes && data.episodes.length > 0) {
-								if (season === 1) {
-									try {
-										var fixedData = _this.process(data, 1, tvId);
-										if (successCallback) successCallback(fixedData, textStatus, xhr);
-										if (completeCallback) completeCallback(xhr, textStatus);
-										deferred.resolve(fixedData, textStatus, xhr);
-									} catch (e) {
-										if (successCallback) successCallback(data, textStatus, xhr);
-										if (completeCallback) completeCallback(xhr, textStatus);
-										deferred.resolve(data, textStatus, xhr);
-									}
-									return;
-								}
+        // Torrent DOM генерируется чуть позже → небольшая задержка
+        setTimeout(function(){
+            const cards = document.querySelectorAll('.torrent-serial.selector');
+            if(cards.length){
+                patchCards(cards, tmdbEpisodes);
+                log('UI Updated');
+            }
+        }, 200);
+    });
 
-								if (successCallback) successCallback(data, textStatus, xhr);
-								if (completeCallback) completeCallback(xhr, textStatus);
-								deferred.resolve(data, textStatus, xhr);
-							} else {
-								runSmartFix();
-							}
-						},
-						error: function (xhr, textStatus, errorThrown) {
-							runSmartFix();
-						},
-					});
-
-					return promise;
-				}
-
-				return originalAjax.apply(this, arguments);
-			};
-		},
-
-		process: function (data, requestedSeason, tvId) {
-			var copyData = JSON.parse(JSON.stringify(data));
-			var allEps = copyData.episodes || [];
-
-			if (allEps.length === 0) return copyData;
-
-			var seasonsMap = {};
-			var currentSeason = 1;
-			var lastDay = 0;
-
-			allEps.sort(function (a, b) {
-				return a.episode_number - b.episode_number;
-			});
-
-			for (var i = 0; i < allEps.length; i++) {
-				var ep = allEps[i];
-
-				var epDay = this.dateToDays(ep.air_date);
-
-				if (epDay > 0 && lastDay > 0) {
-					if (epDay - lastDay > this.gap) {
-						currentSeason++;
-					}
-				}
-
-				if (epDay > 0) lastDay = epDay;
-
-				if (!seasonsMap[currentSeason]) seasonsMap[currentSeason] = [];
-
-				ep.season_number = currentSeason;
-
-				ep.episode_number = seasonsMap[currentSeason].length + 1;
-
-				ep.id = 900000 + currentSeason * 1000 + ep.episode_number;
-
-				seasonsMap[currentSeason].push(ep);
-			}
-
-			var resultEps = seasonsMap[requestedSeason] || [];
-
-			if (requestedSeason > 1 && resultEps.length === 0) {
-				for (var k = 1; k <= 12; k++) {
-					resultEps.push({
-						id: 888000 + k,
-						episode_number: k,
-						name: "Episode " + k,
-						air_date: "2025-01-01",
-						overview: "Нет данных в TMDB. (SmartFix)",
-						season_number: requestedSeason,
-						still_path: null,
-						vote_average: 5.0,
-					});
-				}
-			}
-
-			copyData.episodes = resultEps;
-			copyData.name = "Season " + requestedSeason;
-			copyData.season_number = requestedSeason;
-			copyData._id = "smart_id_" + tvId + "_" + requestedSeason;
-			copyData.id = 50000 + requestedSeason * 100;
-
-			return copyData;
-		},
-
-		makeStubs: function (tvId, sNum) {
-			var eps = [];
-			for (var i = 1; i <= 12; i++) {
-				eps.push({
-					id: 777000 + i,
-					episode_number: i,
-					name: "Episode " + i,
-					overview: "Offline Fix",
-					season_number: sNum,
-					air_date: "2025-01-01",
-					still_path: null,
-				});
-			}
-			return {
-				episodes: eps,
-				name: "Season " + sNum,
-				season_number: sNum,
-				overview: "",
-				id: 666000,
-				poster_path: null,
-			};
-		},
-	};
-
-	function start() {
-		if (window.ANIME_FIX_LOADED) return;
-		window.ANIME_FIX_LOADED = true;
-		SEASON_FIX.init();
-	}
-
-	if (typeof Lampa !== "undefined") {
-		if (window.appready) start();
-		else
-			Lampa.Listener.follow("app", function (e) {
-				if (e.type == "ready") start();
-			});
-	} else {
-		var t = setInterval(function () {
-			if (typeof Lampa !== "undefined") {
-				clearInterval(t);
-				if (window.appready) start();
-				else
-					Lampa.Listener.follow("app", function (e) {
-						if (e.type == "ready") start();
-					});
-			}
-		}, 100);
-	}
+    log('Loaded!');
 })();
