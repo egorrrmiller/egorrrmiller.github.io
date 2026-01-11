@@ -93,6 +93,8 @@
     // Инициализация плагина  
     function init() {
         Lampa.Listener.follow('torrent_file', (e) => {
+            console.info('e', e)
+
             if (e.type === 'list_open') {
                 // Очистка кэша при открытии нового списка  
                 seasonCache = {};
