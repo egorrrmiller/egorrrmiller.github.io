@@ -1,5 +1,5 @@
 (function() {
-    const TMDB_API_KEY = 'YOUR_TMDB_API_KEY'; // вставь свой API ключ
+    const TMDB_API_KEY = '4ef0d7355d9ffb5151e987764708ce96'; // вставь свой API ключ
     const cache = {};
 
     async function fetchTMDB(title, season, episode) {
@@ -7,12 +7,12 @@
         if (cache[key]) return cache[key];
 
         try {
-            const searchRes = await fetch(`https://api.themoviedb.org/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
+            const searchRes = await fetch(`https://apitmdb.mirror-kurwa.men/3/search/tv?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(title)}`);
             const searchData = await searchRes.json();
             if (!searchData.results || searchData.results.length === 0) return null;
 
             const tvId = searchData.results[0].id;
-            const epRes = await fetch(`https://api.themoviedb.org/3/tv/${tvId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`);
+            const epRes = await fetch(`https://apitmdb.mirror-kurwa.men/3/tv/${tvId}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`);
             const epData = await epRes.json();
 
             const result = {
