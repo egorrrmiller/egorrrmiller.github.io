@@ -23,12 +23,14 @@
 
                 if (!movie || !movie.id || !data.title) return;
 
-                const match = data.folder_name.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
+                var fileName = data.folder_name || data.path;
 
-                console.log('match', match);
+                const isPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
-                if (match) {
-                    const partNumber = parseInt(match[1]);
+                console.log('match', isPart);
+
+                if (isPart) {
+                    const partNumber = parseInt(isPart[1]);
                     const seasonNum = data.season || 1;
                     const cacheKey = `${movie.id}_s${seasonNum}`;
 
@@ -70,11 +72,13 @@
                     if (seasonCache[cacheKey]) {
                         applyEpisodeData(seasonCache[cacheKey]);
                     } else {
-                        Lampa.TMDB.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                        Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
                             if (tmdbData && tmdbData.episodes) {
                                 seasonCache[cacheKey] = tmdbData.episodes;
                                 applyEpisodeData(tmdbData.episodes);
                             }
+                        }, (error) => {
+                            console.error('API error:', error);
                         });
                     }
                 }
