@@ -20,12 +20,8 @@
                 // Обработчик кнопки "Готово"
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                     try {
-                        var enter = $.Event('keydown');
-                        enter.which = 13; // Исправлено на 13 (Enter)
-                        enter.keyCode = 13;
-
-                        input.dispatchEvent(enter);
-                        console.log('Lampa Plugin: Autonomous Enter Triggered');
+                        Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
+                        Lampa.Controller.enter();
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
                     }
