@@ -13,9 +13,9 @@
                 seasonCache = {};
             }
             else if (e.type === 'render') {
-                const item = e.item;
-                const data = e.element;
-                const movie = e.params.movie;
+                let item = e.item;
+                let data = e.element;
+                let movie = e.params.movie;
 
                 console.log('item', item);
                 console.log('data', data);
@@ -23,39 +23,39 @@
 
                 if (!movie || !movie.id || !data.title) return;
 
-                var fileName = data.folder_name || data.path;
+                let fileName = data.folder_name || data.path;
 
-                const isPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
+                let isPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
                 console.log('match', isPart);
 
                 if (isPart) {
-                    const partNumber = parseInt(isPart[1]);
-                    const seasonNum = data.season || 1;
-                    const cacheKey = `${movie.id}_s${seasonNum}`;
+                    let partNumber = parseInt(isPart[1]);
+                    let seasonNum = data.season || 1;
+                    let cacheKey = `${movie.id}_s${seasonNum}`;
 
                     const applyEpisodeData = (episodes) => {
                         // Вычисляем номер эпизода: общее кол-во - номер части
-                        const totalEpisodes = episodes.length;
-                        const targetEpisodeNumber = totalEpisodes - partNumber;
+                        let totalEpisodes = episodes.length;
+                        let targetEpisodeNumber = totalEpisodes - partNumber;
 
                         console.log('totalEpisodes', totalEpisodes);
                         console.log('partNumber', partNumber);
 
                         // Ищем эпизод с вычисленным номером
-                        const targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
+                        let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
 
                         if (targetEpisode) {
                             // Обновляем DOM
                             item.find('.torrent-serial__title').text(targetEpisode.name);
 
                             if (targetEpisode.air_date) {
-                                const date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
+                                let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
                                 item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
                             }
 
                             if (targetEpisode.still_path) {
-                                const img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
+                                let img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
                                 item.find('.torrent-serial__img').attr('src', img);
                             }
 
@@ -63,7 +63,7 @@
                             data.title = targetEpisode.name;
                             data.fname = targetEpisode.name;
                             data.air_date = targetEpisode.air_date;
-                            data.img = img;
+                            //data.img = img;
 
                             console.log(`Часть ${partNumber} → Эпизод ${targetEpisodeNumber}: ${targetEpisode.name}`);
                         }
