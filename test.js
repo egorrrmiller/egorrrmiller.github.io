@@ -2,19 +2,29 @@
     try {
         let seasonCache = {};
 
+        // сюда попадем столько раз, сколько файлов в торренте
         Lampa.Listener.follow('torrent_file', (e) => {
             if (e.type === 'list_open') {
                 seasonCache = {}; // Очистка при открытии нового списка
             }
             else if (e.type === 'render') {
-                let item = e.item;
-                let data = e.element;
-                let movie = e.params.movie;
-                let allFiles = e.items; // Весь список файлов в торренте
-
                 console.log('e', e)
+                console.log(seasonCache)
 
-                if (!movie || !movie.id || !data.title || !allFiles) return;
+                let html = e.item;
+                let data = e.element;
+                let episode = data.episode; // каждый раз разный эпизод.
+
+                let allFilesCount = e.items;
+                let movie = e.params.movie;
+                
+                /*
+                * 
+                * 
+                * 
+                * */
+
+                if (!movie || !movie.id || !data.title || !allFilesCount) return;
 
                 let fileName = data.folder_name || data.path;
                 let checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
@@ -27,7 +37,7 @@
 
                     let applyEpisodeData = (episodes) => {
                         console.log('episodes', episodes);
-                        let totalInTorrent = allFiles.length;
+                        let totalInTorrent = allFilesCount.length;
                         let totalInTMDB = episodes.length;
 
                         /* Логика: если в торренте файлов меньше, чем в сезоне,
@@ -45,17 +55,17 @@
 
                         if (targetEpisode) {
                             // Обновление UI
-                            item.find('.torrent-serial__title').text(targetEpisode.name);
+                            html.find('.torrent-serial__title').text(targetEpisode.name);
 
                             if (targetEpisode.air_date) {
                                 let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
-                                item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
+                                html.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
                             }
 
                             let img;
                             if (targetEpisode.still_path) {
                                 img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
-                                item.find('.torrent-serial__img').attr('src', img);
+                                html.find('.torrent-serial__img').attr('src', img);
                             }
 
                             // Обновление объекта данных (для плеера)
