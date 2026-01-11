@@ -25,7 +25,8 @@
                     let seasonNum = data.season || 1;
                     let cacheKey = `${movie.id}_s${seasonNum}`;
 
-                    const applyEpisodeData = (episodes) => {
+                    let applyEpisodeData = (episodes) => {
+                        console.log('episodes', episodes);
                         let totalInTorrent = allFiles.length;
                         let totalInTMDB = episodes.length;
 
@@ -70,7 +71,7 @@
                                 let eps = tmdbData.episodes_original;
                                 seasonCache[cacheKey] = eps;
                                 applyEpisodeData(eps);
-                                
+
                                 console.log(tmdbData);
                             }
                         }, (error) => {
