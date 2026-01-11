@@ -4,35 +4,31 @@
     function injectCustomButtons() {
         try {
             // Ищем контейнер клавиатуры
-            var keyboard = $('.simple-keyboard');
+            var keyboard = $('.test-buttons');
             
             // Если клавиатура на месте, а наших кнопок еще нет
-            if (keyboard.length && !keyboard.find('.my-custom-buttons').length) {
+            if (keyboard.length) {
                 
                 // Создаем блок кнопок
                 var $buttons = $(
-                    '<div class="simple-keyboard-buttons my-custom-buttons">' +
-                        '<div class="simple-keyboard-buttons__enter selector" style="pointer-events: all; cursor: pointer;">Готово</div>' +
-                        '<div class="simple-keyboard-buttons__cancel selector" style="pointer-events: all; cursor: pointer;">Отменить</div>' +
+                    '<div class="test-buttons">' +
+                        '<div class="test-buttons__enter">Готово</div>' +
+                        '<div class="test-buttons__cancel">Отменить</div>' +
                     '</div>'
                 );
 
                 // Обработчик кнопки "Готово"
-                $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
+                $buttons.find('.test-buttons__enter').on('click', function (e) {
                     try {
-                        var enter = $.Event('keydown');  
-                        enter.which = 13;  
-                        enter.keyCode = 13;
-                        
-                        Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
                         Lampa.Controller.enter();
+                        console.log('Lampa Plugin: press enter');
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
                     }
                 });
 
                 // Обработчик кнопки "Отменить"
-                $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {
+                $buttons.find('.test-buttons__cancel').on('click', function (e) {
                     try {
                         e.preventDefault();
                         
