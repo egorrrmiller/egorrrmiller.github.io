@@ -1,6 +1,6 @@
 (function () {
     function getDirectTMDBImage(path, size) {
-        return `https://media.themoviedb.org/t/p/w227_and_h127_face/${path}`;
+        return `https://image.tmdb.org/t/p/${size}${path}`;
     }
 
     try {
@@ -61,7 +61,7 @@
 
                             let img;
                             if (targetEpisode.still_path) {
-                                img = getDirectTMDBImage(targetEpisode.still_path, "w500");
+                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w300');
                                 html.find('.torrent-serial__img').attr('src', img);
                             }
 
