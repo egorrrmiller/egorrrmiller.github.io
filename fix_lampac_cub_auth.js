@@ -1,88 +1,73 @@
 (function () {
     'use strict';
 
-    function setupKeyboard() {
-        var keyboardWrap = document.querySelector('.simple-keyboard');
+    function initCustomKeyboard() {
+        // Проверяем, что клавиатура отрисована
+        var keyboardWrap = $('.simple-keyboard');
         
-        if (keyboardWrap) {
-            // 1. Пытаемся найти существующие кнопки
-            var btnEnter = keyboardWrap.querySelector('.simple-keyboard-buttons__enter');
-            var btnCancel = keyboardWrap.querySelector('.simple-keyboard-buttons__cancel');
+        // Если клавиатура есть, а наших кнопок или системных еще нет
+        if (keyboardWrap.length && !keyboardWrap.find('.simple-keyboard-buttons').length) {
+            
+            // Создаем блок кнопок (используем структуру Lampa)
+            var buttons = $('<div class="simple-keyboard-buttons plugin-added"><div class="simple-keyboard-buttons__enter selector">' + Lampa.Lang.translate('ready') + '</div><div class="simple-keyboard-buttons__cancel selector">' + Lampa.Lang.translate('cancel') + '</div></div>');
 
-            // 2. Если кнопок нет (как в браузерной версии), создаем их
-            if (!btnEnter) {
-                var buttonsHTML = '<div class="simple-keyboard-buttons plugin-buttons-added">' +
-                                    '<div class="simple-keyboard-buttons__enter selector">Готово</div>' +
-                                    '<div class="simple-keyboard-buttons__cancel selector">Отменить</div>' +
-                                  '</div>';
-                keyboardWrap.insertAdjacentHTML('beforeend', buttonsHTML);
-                
-                // Перепривязываем переменные к только что созданным кнопкам
-                btnEnter = keyboardWrap.querySelector('.simple-keyboard-buttons__enter');
-                btnCancel = keyboardWrap.querySelector('.simple-keyboard-buttons__cancel');
-            }
+            // Находим текущий активный объект ввода в Lampa
+            // Lampa.Input.active() - это ссылка на текущий экземпляр класса Input
+            var inputInstance = Lampa.Input.active ? Lampa.Input.active() : null;
 
-            // 3. Если кнопки теперь есть (были или созданы) и еще не "оживлены"
-            if (btnEnter && !btnEnter.classList.contains('plugin-active')) {
-                
-                // Добавляем классы для навигации Lampa
-                btnEnter.classList.add('plugin-active', 'selector');
-                btnCancel.classList.add('plugin-active', 'selector');
+            // Обработка клика "Готово"
+            buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
+                var inputField = keyboardWrap.find('input');
+                inputField.blur(); // Убираем фокус с поля
 
-                // Логика кнопки Готово
-                btnEnter.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    
-                    // Эмулируем нажатие Enter для всего документа
-                    var ev = new KeyboardEvent('keydown', {
-                        keyCode: 13,
-                        which: 13,
-                        bubbles: true
-                    });
-                    document.dispatchEvent(ev);
-                    
-                    // Дополнительно: пробуем вызвать событие change на инпуте
-                    var input = keyboardWrap.querySelector('input');
-                    if(input) {
-                        input.dispatchEvent(new Event('change', { bubbles: true }));
-                    }
-                });
-
-                // Логика кнопки Отменить
-                btnCancel.addEventListener('click', function (e) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    if (window.Lampa && window.Lampa.Input) {
-                        window.Lampa.Input.close();
-                    } else {
-                        // Если системный метод недоступен, жмем Escape
-                        var ev = new KeyboardEvent('keydown', { keyCode: 27, bubbles: true });
-                        document.dispatchEvent(ev);
-                    }
-                });
-
-                // Обязательно обновляем контроллер Lampa
-                if (window.Lampa && window.Lampa.Controller) {
-                    window.Lampa.Controller.update();
+                if (inputInstance && inputInstance.listener) {
+                    inputInstance.listener.send('enter', { value: inputField.val() });
+                } else {
+                    // Резервный метод через эмуляцию клавиши
+                    var e = $.Event('keydown');
+                    e.which = 13;
+                    $(document).trigger(e);
                 }
+            });
+
+            // Обработка клика "Отменить"
+            buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
+                if (inputInstance && typeof inputInstance.value === 'function') {
+                    inputInstance.value(''); // Очищаем значение
+                }
+                
+                if (window.Lampa.Controller) {
+                    window.Lampa.Controller.back(); // Возвращаемся (закрываем клавиатуру)
+                }
+            });
+
+            // Добавляем кнопки в интерфейс
+            keyboardWrap.append(buttons);
+
+            // Сообщаем Lampa, что нужно обновить список активных элементов (для навигации пультом)
+            if (window.Lampa.Controller) {
+                window.Lampa.Controller.update();
             }
         }
     }
 
-    // Наблюдатель за появлением элементов
+    // Слушаем изменения в DOM, чтобы вовремя поймать создание клавиатуры
     var observer = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes.length) {
-                setupKeyboard();
+        mutations.forEach(function (mutation) {
+            if (mutation.addedNodes.length) {
+                initCustomKeyboard();
             }
-        }
+        });
     });
 
     function start() {
         if (window.appready && window.Lampa) {
-            observer.observe(document.body, { childList: true, subtree: true });
-            setupKeyboard();
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            // Проверка на случай, если клавиатура уже была открыта до старта плагина
+            initCustomKeyboard();
         } else {
             setTimeout(start, 200);
         }
