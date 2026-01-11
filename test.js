@@ -61,7 +61,9 @@
 
                             let img;
                             if (targetEpisode.still_path) {
-                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w300');
+                                img = Lampa.TMDB.image(targetEpisode.still_path);
+                                console.info('img', img)
+                                
                                 html.find('.torrent-serial__img').attr('src', img);
                             }
 
