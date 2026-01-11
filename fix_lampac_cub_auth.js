@@ -1,75 +1,52 @@
 (function () {
     'use strict';
 
-    function injectCustomButtons() {
+    function inject() {
         var keyboard = $('.simple-keyboard');
         
-        if (keyboard.length && !keyboard.find('.my-custom-buttons').length) {
-            var $buttons = $(
-                '<div class="simple-keyboard-buttons my-custom-buttons">' +
-                    '<div class="simple-keyboard-buttons__enter selector" style="pointer-events: all; cursor: pointer;">Готово</div>' +
-                    '<div class="simple-keyboard-buttons__cancel selector" style="pointer-events: all; cursor: pointer;">Отменить</div>' +
-                '</div>'
-            );
+        if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
+            // Прямые переменные из контекста Lampa
+            var _this = Lampa.Input.active();
+            var input = keyboard.find('#orsay-keyboard');
+            var Lang = Lampa.Lang;
+            var Controller = Lampa.Controller;
 
-            // ОБРАБОТЧИК КНОПКИ "ГОТОВО"
-            $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                var $input = keyboard.find('input');
-                var val = $input.val(); // Забираем текст из инпута
+            // ТВОЙ КОД (CTRL+C / CTRL+V)
+            var buttons = $('<div class="simple-keyboard-buttons"><div class="simple-keyboard-buttons__enter">' + Lang.translate('ready') + '</div><div class="simple-keyboard-buttons__cancel">' + Lang.translate('cancel') + '</div></div>');
+            
+            buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
+                input.blur();
 
-                console.log('Plugin: Preparing to submit value:', val);
+                _this.listener.send('enter');
+            });
+            
+            buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
+                _this.value('');
 
-                // 1. Принудительно вызываем событие завершения ввода на инпуте
-                $input.trigger($.Event('keydown', { keyCode: 13, which: 13 }));
-                $input.blur();
-
-                // 2. Если в Lampa активен объект Input, отправляем данные через его слушатель
-                if (window.Lampa && window.Lampa.Input && window.Lampa.Input.active) {
-                    var activeInput = window.Lampa.Input.active();
-                    if (activeInput && activeInput.listener) {
-                        activeInput.listener.send('enter', { value: val });
-                    }
-                }
-
-                // 3. Универсальный способ - закрыть клавиатуру через контроллер
-                // В Lampa это часто триггерит сохранение данных
-                if (window.Lampa && window.Lampa.Input && window.Lampa.Input.close) {
-                    window.Lampa.Input.close();
-                }
+                Controller.back();
             });
 
-            // ОБРАБОТЧИК КНОПКИ "ОТМЕНИТЬ"
-            $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {
-                e.preventDefault();
-                e.stopPropagation();
-                if (window.Lampa && window.Lampa.Controller) {
-                    window.Lampa.Controller.back();
-                }
-            });
+            $('.simple-keyboard').append(buttons);
+            // КОНЕЦ ТВОЕГО КОДА
 
-            keyboard.append($buttons);
-
-            if (window.Lampa && window.Lampa.Controller) {
-                window.Lampa.Controller.update();
-            }
+            // Добавляем селекторы, иначе кнопки не нажать
+            buttons.find('div').addClass('selector');
+            Controller.update();
         }
     }
 
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
-            if (mutation.addedNodes.length) injectCustomButtons();
+            if (mutation.addedNodes.length) inject();
         });
     });
 
     function start() {
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
-            injectCustomButtons();
+            inject();
         } else {
-            setTimeout(start, 200);
+            setTimeout(start, 100);
         }
     }
 
