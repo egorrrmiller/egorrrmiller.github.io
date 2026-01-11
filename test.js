@@ -9,7 +9,6 @@
             }
             else if (e.type === 'render') {
                 console.log('e', e)
-                console.log(seasonCache)
 
                 let html = e.item;
                 let data = e.element;
@@ -17,11 +16,11 @@
 
                 let allFilesCount = e.items;
                 let movie = e.params.movie;
-                
+
                 /*
                 * 
-                * 
-                * 
+                *
+                *
                 * */
 
                 if (!movie || !movie.id || !data.title || !allFilesCount) return;
@@ -78,6 +77,7 @@
                     // Проверка кэша или запрос к API
                     if (seasonCache[cacheKey]) {
                         applyEpisodeData(seasonCache[cacheKey]);
+                        console.log('cache', seasonCache[cacheKey]);
                     } else {
                         Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
                             if (tmdbData && (tmdbData.episodes_original)) {
