@@ -13,75 +13,77 @@
                 seasonCache = {};
             }
             else if (e.type === 'render') {
-                let item = e.item;
-                let data = e.element;
-                let movie = e.params.movie;
 
-                console.log('e', e);
+                e.items.forEach(item => {
+                    let data = e.element;
+                    let movie = e.params.movie;
 
-                if (!movie || !movie.id || !data.title) return;
+                    console.log('e', e);
 
-                let fileName = data.folder_name || data.path;
+                    if (!movie || !movie.id || !data.title) return;
 
-                let isPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
+                    let fileName = data.folder_name || data.path;
 
-                console.log('match', isPart);
+                    let isPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
-                if (isPart) {
-                    let partNumber = parseInt(isPart[1]);
-                    let seasonNum = data.season || 1;
-                    let cacheKey = `${movie.id}_s${seasonNum}`;
+                    console.log('match', isPart);
 
-                    const applyEpisodeData = (episodes) => {
-                        // Вычисляем номер эпизода: общее кол-во - номер части
-                        let totalEpisodes = episodes.length;
-                        let targetEpisodeNumber = totalEpisodes - partNumber;
+                    if (isPart) {
+                        let partNumber = parseInt(isPart[1]);
+                        let seasonNum = data.season || 1;
+                        let cacheKey = `${movie.id}_s${seasonNum}`;
 
-                        console.log('totalEpisodes', totalEpisodes);
-                        console.log('partNumber', partNumber);
+                        const applyEpisodeData = (episodes) => {
+                            // Вычисляем номер эпизода: общее кол-во - номер части
+                            let totalEpisodes = episodes.length;
+                            let targetEpisodeNumber = totalEpisodes - partNumber;
 
-                        // Ищем эпизод с вычисленным номером
-                        let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
+                            console.log('totalEpisodes', totalEpisodes);
+                            console.log('partNumber', partNumber);
 
-                        if (targetEpisode) {
-                            // Обновляем DOM
-                            item.find('.torrent-serial__title').text(targetEpisode.name);
+                            // Ищем эпизод с вычисленным номером
+                            let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
 
-                            if (targetEpisode.air_date) {
-                                let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
-                                item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
+                            if (targetEpisode) {
+                                // Обновляем DOM
+                                item.find('.torrent-serial__title').text(targetEpisode.name);
+
+                                if (targetEpisode.air_date) {
+                                    let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
+                                    item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
+                                }
+                                let img;
+                                if (targetEpisode.still_path) {
+                                    img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
+                                    item.find('.torrent-serial__img').attr('src', img);
+                                }
+
+                                // Обновляем данные
+                                data.title = targetEpisode.name;
+                                data.fname = targetEpisode.name;
+                                data.air_date = targetEpisode.air_date;
+
+                                data.img = img;
+
+                                console.log(`Часть ${partNumber} → Эпизод ${targetEpisodeNumber}: ${targetEpisode.name}`);
                             }
-                            let img;
-                            if (targetEpisode.still_path) {
-                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
-                                item.find('.torrent-serial__img').attr('src', img);
-                            }
+                        };
 
-                            // Обновляем данные
-                            data.title = targetEpisode.name;
-                            data.fname = targetEpisode.name;
-                            data.air_date = targetEpisode.air_date;
-
-                            data.img = img;
-
-                            console.log(`Часть ${partNumber} → Эпизод ${targetEpisodeNumber}: ${targetEpisode.name}`);
+                        if (seasonCache[cacheKey]) {
+                            applyEpisodeData(seasonCache[cacheKey]);
+                        } else {
+                            Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                                console.log('tmdbData', tmdbData);
+                                if (tmdbData && tmdbData.episodes_original) {
+                                    seasonCache[cacheKey] = tmdbData.episodes_original;
+                                    applyEpisodeData(tmdbData.episodes_original);
+                                }
+                            }, (error) => {
+                                console.error('API error:', error);
+                            });
                         }
-                    };
-
-                    if (seasonCache[cacheKey]) {
-                        applyEpisodeData(seasonCache[cacheKey]);
-                    } else {
-                        Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
-                            console.log('tmdbData', tmdbData);
-                            if (tmdbData && tmdbData.episodes) {
-                                seasonCache[cacheKey] = tmdbData.episodes;
-                                applyEpisodeData(tmdbData.episodes);
-                            }
-                        }, (error) => {
-                            console.error('API error:', error);
-                        });
                     }
-                }
+                })
             }
         });
     }
