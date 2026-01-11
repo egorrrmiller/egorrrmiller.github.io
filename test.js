@@ -1,4 +1,8 @@
 (function () {
+    function getDirectTMDBImage(path, size) {
+        return `https://media.themoviedb.org/t/p/w227_and_h127_face/${path}`;
+    }
+
     try {
         let seasonCache = {};
 
@@ -57,7 +61,7 @@
 
                             let img;
                             if (targetEpisode.still_path) {
-                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
+                                img = getDirectTMDBImage(targetEpisode.still_path, "w500");
                                 html.find('.torrent-serial__img').attr('src', img);
                             }
 
