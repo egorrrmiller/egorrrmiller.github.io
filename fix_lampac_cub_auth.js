@@ -20,13 +20,21 @@
                 // Обработчик кнопки "Готово"
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                     try {
-                        var enter = $.Event('keydown');  
-                        enter.which = 13;  
-                        enter.keyCode = 13;
-                        
-                        window.Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
-                        window.Lampa.Controller.enter();
-                        console.log('press enter');
+                        // Находим и фокусируем поле ввода  
+        var input = $('.simple-keyboard-input');  
+        if (input.length) {  
+            input.focus();  
+              
+            // Альтернативно: напрямую вызываем обработчик ввода  
+            var inputValue = input.val();  
+            if (window.Lampa.Input && window.Lampa.Input.callback) {  
+                window.Lampa.Input.callback(inputValue);  
+            }  
+        }  
+          
+        // Или отправляем Enter после фокуса  
+        window.Lampa.Controller.enter();  
+        console.log('press enter'); 
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
                     }
