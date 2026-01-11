@@ -24,7 +24,7 @@
                         enter.which = 13; // Исправлено на 13 (Enter)
                         enter.keyCode = 13;
 
-                        $(document).trigger(enter);
+                        input.dispatchEvent(enter);
                         console.log('Lampa Plugin: Autonomous Enter Triggered');
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
