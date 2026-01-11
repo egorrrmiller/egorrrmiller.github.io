@@ -1,12 +1,6 @@
 (function () {
     'use strict';
 
-    // Стили для фокуса с пульта
-    var style = $('<style>' +
-        '.simple-keyboard-buttons .selector.focus { background: rgba(255, 255, 255, 0.2) !important; border: 1px solid #fff; }' +
-    '</style>');
-    $('head').append(style);
-
     function injectCustomButtons() {
         try {
             var keyboard = $('.simple-keyboard');
@@ -20,8 +14,8 @@
                     '</div>'
                 );
 
-                // Твой рабочий метод прожатия Enter
-                $buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
+                // Функция для имитации Enter (твой рабочий метод)
+                var triggerEnter = function() {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
                         input.blur();
@@ -33,32 +27,39 @@
                         input.dispatchEvent(up);
                         document.dispatchEvent(up);
                     }
+                };
+
+                // Применяем логику нажатий как в select_weapon (через hover:enter и click)
+                $buttons.find('.simple-keyboard-buttons__enter').on('hover:enter', function() {
+                    triggerEnter();
+                }).on('click', function(e) {
+                    if (Lampa.DeviceInput.canClick(e.originalEvent)) triggerEnter();
                 });
 
-                $buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                    if (window.Lampa && window.Lampa.Controller) {
-                        window.Lampa.Controller.back();
-                    }
+                $buttons.find('.simple-keyboard-buttons__cancel').on('hover:enter', function() {
+                    if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
+                }).on('click', function(e) {
+                    if (Lampa.DeviceInput.canClick(e.originalEvent)) window.Lampa.Controller.back();
                 });
 
-                // Вставляем кнопки
+                // Добавляем кнопки
                 keyboard.append($buttons);
 
-                // РЕГИСТРАЦИЯ ДЛЯ ПУЛЬТА (как в select_weapon, но без создания нового слоя)
+                // ОБНОВЛЕНИЕ НАВИГАЦИИ (метод из select_weapon)
                 if (window.Lampa && window.Lampa.Controller) {
-                    var controller = window.Lampa.Controller.enabled();
+                    // Даем контроллеру понять, что список селекторов изменился
+                    window.Lampa.Controller.update();
                     
-                    if (controller && controller.name === 'keyboard') {
-                        // Добавляем наши кнопки в текущую коллекцию элементов контроллера
-                        controller.collection = keyboard.find('.selector');
-                        
-                        // Пересчитываем навигацию
-                        window.Lampa.Controller.update();
+                    // Если мы уже в слое клавиатуры, заставляем его пересчитать коллекцию
+                    var current = window.Lampa.Controller.enabled();
+                    if (current && current.name === 'keyboard') {
+                        // В Lampa коллекция обновляется через обращение к контейнеру
+                        Lampa.Controller.collectionSet(keyboard);
                     }
                 }
             }
         } catch (globalErr) {
-            console.error('Lampa Plugin Error:', globalErr);
+            console.error('Lampa Plugin: Critical Error:', globalErr);
         }
     }
 
