@@ -1,13 +1,9 @@
 (function () {
     'use strict';
 
-    // Стили для выделения (мышка + пульт)
     var style = $('<style>' +
-        '.simple-keyboard-buttons .selector { cursor: pointer; transition: all 0.2s; border-radius: 4px; }' +
-        '.simple-keyboard-buttons .selector:hover { background: rgba(255, 255, 255, 0.1); }' +
-        '.simple-keyboard-buttons .selector.focus { background: rgba(255, 255, 255, 0.2); border: 1px solid #fff; }' +
-        '.simple-keyboard-buttons__enter.selector.focus { background: rgba(0, 255, 0, 0.2); }' +
-        '.simple-keyboard-buttons__cancel.selector.focus { background: rgba(255, 0, 0, 0.2); }' +
+        '.simple-keyboard-buttons .selector { cursor: pointer; transition: all 0.2s; border-radius: 4px; padding: 10px; margin: 5px; text-align: center; background: rgba(255, 255, 255, 0.05); }' +
+        '.simple-keyboard-buttons .selector.focus { background: rgba(255, 255, 255, 0.2) !important; border: 1px solid #fff; }' +
     '</style>');
     $('head').append(style);
 
@@ -16,15 +12,14 @@
             var keyboard = $('.simple-keyboard');
             
             if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
-                
                 var $buttons = $(
                     '<div class="simple-keyboard-buttons">' +
-                        '<div class="simple-keyboard-buttons__enter selector">Готово</div>' +
-                        '<div class="simple-keyboard-buttons__cancel selector">Отменить</div>' +
+                        '<div class="simple-keyboard-buttons__enter selector" nav-selectable="true">Готово</div>' +
+                        '<div class="simple-keyboard-buttons__cancel selector" nav-selectable="true">Отменить</div>' +
                     '</div>'
                 );
 
-                // Добавляем обработчики
+                // Обработчик "Готово" (Enter)
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
@@ -36,29 +31,40 @@
                     }
                 });
 
+                // Обработчик "Отменить" (Back)
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
                     if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
                 });
 
-                // ВАЖНО: Добавляем кнопки в DOM
                 keyboard.append($buttons);
 
-                // ЗАСТАВЛЯЕМ ПУЛЬТ ВИДЕТЬ КНОПКИ
+                // ИНТЕГРАЦИЯ В КОНТРОЛЛЕР
                 if (window.Lampa && window.Lampa.Controller) {
-                    // 1. Помечаем элементы для навигации
-                    $buttons.find('.selector').attr('nav-selectable', 'true');
-                    
-                    // 2. Обновляем текущий контекст контроллера
-                    window.Lampa.Controller.update();
-                    
-                    // 3. Если фокус сейчас на клавиатуре, заставляем контроллер пересканировать слой
-                    var current = window.Lampa.Controller.enabled();
-                    if (current && current.name === 'keyboard') {
-                        // Добавляем наши кнопки в список доступных для выбора элементов текущего слоя
-                        if (current.container) {
-                            window.Lampa.Controller.render();
+                    // Ждем микросекунду, чтобы DOM прожевал кнопки
+                    setTimeout(function() {
+                        var current = window.Lampa.Controller.enabled();
+                        
+                        // Если мы в слое клавиатуры
+                        if (current && (current.name === 'keyboard' || keyboard.is(':visible'))) {
+                            // Добавляем наши кнопки в коллекцию элементов текущего слоя
+                            current.container.find('.selector').off('hover').on('hover', function() {
+                                // Позволяем Lampa подсвечивать их при наведении
+                            });
+                            
+                            // Принудительно обновляем список доступных элементов
+                            window.Lampa.Controller.add({
+                                name: 'keyboard_buttons',
+                                selector: '.simple-keyboard-buttons .selector',
+                                layer: current.layer || 'content',
+                                parent: current,
+                                onEnter: function(el) {
+                                    $(el).trigger('click');
+                                }
+                            });
+                            
+                            window.Lampa.Controller.update();
                         }
-                    }
+                    }, 100);
                 }
             }
         } catch (globalErr) {
