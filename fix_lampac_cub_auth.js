@@ -2,84 +2,82 @@
     'use strict';
 
     function inject() {
-        var keyboard = $('.simple-keyboard');
-        // Проверка: клавиатура есть, а наших кнопок еще нет
-        if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
-            
-            var $buttons = $(
-                '<div class="simple-keyboard-buttons">' +
-                    '<div class="simple-keyboard-buttons__enter selector" nav-selectable="true">Готово</div>' +
-                    '<div class="simple-keyboard-buttons__cancel selector" nav-selectable="true">Отменить</div>' +
-                '</div>'
-            );
-
-            // Универсальный метод "Ввода"
-            var doEnter = function() {
-                // Берем тот элемент, который сейчас в фокусе (инпут)
-                var active = document.activeElement;
-                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) {
-                    active.blur(); // Сохраняем введенное
-                }
-
-                // Генерируем событие Enter на всем документе (самый надежный способ для ТВ)
-                var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-                document.dispatchEvent(new KeyboardEvent('keyup', eventParams));
+        try {
+            var keyboard = $('.simple-keyboard');
+            if (keyboard.length && !keyboard.find('.simple-keyboard-buttons').length) {
                 
-                // Дополнительно: пробуем нажать через контроллер Lampa
-                if (window.Lampa && Lampa.Controller) {
-                    var current = Lampa.Controller.enabled();
-                    if (current && current.onEnter) current.onEnter();
-                }
-            };
+                var $buttons = $(
+                    '<div class="simple-keyboard-buttons">' +
+                        '<div class="simple-keyboard-buttons__enter selector" nav-selectable="true">Готово</div>' +
+                        '<div class="simple-keyboard-buttons__cancel selector" nav-selectable="true">Отменить</div>' +
+                    '</div>'
+                );
 
-            // Привязываем действия к кнопкам
-            $buttons.find('.simple-keyboard-buttons__enter').on('click hover:enter', function() {
-                doEnter();
-            });
-
-            $buttons.find('.simple-keyboard-buttons__cancel').on('click hover:enter', function() {
-                if (window.Lampa && window.Lampa.Controller) Lampa.Controller.back();
-            });
-
-            keyboard.append($buttons);
-
-            // Оптимизация навигации для ТВ
-            if (window.Lampa && window.Lampa.Controller) {
-                // Регистрируем кнопки в системе
-                Lampa.Controller.add('custom_kb_ctrl', {
-                    toggle: function() {
-                        Lampa.Controller.collectionSet($buttons);
-                        Lampa.Controller.collectionFocus($buttons.find('.simple-keyboard-buttons__enter')[0], $buttons);
-                    },
-                    up: function() { Lampa.Controller.toggle('keyboard'); },
-                    left: function() { Lampa.Navigator.move('left'); },
-                    right: function() { Lampa.Navigator.move('right'); },
-                    back: function() { Lampa.Controller.back(); }
-                });
-
-                // Перехват стрелки ВНИЗ: если фокус на инпуте, уходим на кнопки
-                $(document).off('keydown.kb_fix').on('keydown.kb_fix', function(e) {
-                    if (e.keyCode === 40) { // Down
+                var triggerEnter = function() {
+                    try {
                         var active = document.activeElement;
-                        if (active && active.tagName === 'INPUT') {
-                            Lampa.Controller.toggle('custom_kb_ctrl');
-                        }
-                    }
+                        if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) active.blur();
+
+                        var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
+                        var ev = new KeyboardEvent('keydown', eventParams);
+                        document.dispatchEvent(ev);
+                        active.dispatchEvent(ev);
+                        
+                        console.log('Lampa Plugin: Enter dispatched safely');
+                    } catch (e) { console.error('Enter error:', e); }
+                };
+
+                // Назначаем события
+                $buttons.find('.simple-keyboard-buttons__enter').on('click hover:enter', function() {
+                    triggerEnter();
                 });
 
-                Lampa.Controller.update();
+                $buttons.find('.simple-keyboard-buttons__cancel').on('click hover:enter', function() {
+                    if (window.Lampa && Lampa.Controller) Lampa.Controller.back();
+                });
+
+                keyboard.append($buttons);
+
+                if (window.Lampa && Lampa.Controller) {
+                    // Регистрация контроллера с защитой от ошибок
+                    Lampa.Controller.add('custom_kb_ctrl', {
+                        toggle: function() {
+                            try {
+                                Lampa.Controller.collectionSet($buttons);
+                                // Убрали collectionFocus, чтобы не было Script Error при расчете координат
+                            } catch (e) { console.error('Toggle error:', e); }
+                        },
+                        up: function() { 
+                            try { Lampa.Controller.toggle('keyboard'); } catch(e) {}
+                        },
+                        left: function() { Lampa.Navigator.move('left'); },
+                        right: function() { Lampa.Navigator.move('right'); },
+                        back: function() { Lampa.Controller.back(); }
+                    });
+
+                    // Глобальный перехват "Вниз"
+                    $(document).off('keydown.kb_fix').on('keydown.kb_fix', function(e) {
+                        if (e.keyCode === 40) { // Down
+                            try {
+                                var active = document.activeElement;
+                                if (active && active.tagName === 'INPUT') {
+                                    Lampa.Controller.toggle('custom_kb_ctrl');
+                                }
+                            } catch (err) { console.error('Navigation error:', err); }
+                        }
+                    });
+
+                    Lampa.Controller.update();
+                }
             }
+        } catch (globalErr) {
+            console.error('Lampa Plugin Inject Error:', globalErr);
         }
     }
 
-    // Следим за DOM
     var observer = new MutationObserver(function (mutations) {
-        for (var i = 0; i < mutations.length; i++) {
-            if (mutations[i].addedNodes.length) {
-                inject();
-                break;
-            }
+        if ($('.simple-keyboard').length && !$('.simple-keyboard-buttons').length) {
+            inject();
         }
     });
 
