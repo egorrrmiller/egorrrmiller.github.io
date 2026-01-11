@@ -6,12 +6,12 @@
             if (e.type === 'list_open') {
                 seasonCache = {}; // Очистка при открытии нового списка
             }
-            else if (e.type === 'render') {                
+            else if (e.type === 'render') {
                 let item = e.item;
                 let data = e.element;
                 let movie = e.params.movie;
-                let allFiles = e.params.items; // Весь список файлов в торренте
-                
+                let allFiles = e.items; // Весь список файлов в торренте
+
                 console.log('e', e)
 
                 if (!movie || !movie.id || !data.title || !allFiles) return;
