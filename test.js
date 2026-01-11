@@ -1,90 +1,85 @@
-/*
-* 1. Получаем карточку фильма/сериала
-*
-* */
-
 (function () {
-
-    function isPart(e, data, movie, episodes = [], partNumber) {
-        if (!episodes || !episodes.length) return;
-        // Вычисляем номер эпизода: общее кол-во - номер части
-        let totalEpisodes = episodes.length;
-        let targetEpisodeNumber = totalEpisodes - partNumber;
-
-        console.log('totalEpisodes', totalEpisodes);
-        console.log('partNumber', partNumber);
-
-        // Ищем эпизод с вычисленным номером
-        let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
-
-        if (targetEpisode) {
-            // Обновляем DOM
-            e.item.find('.torrent-serial__title').text(targetEpisode.name);
-
-            if (targetEpisode.air_date) {
-                let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
-                e.item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
-            }
-            let img;
-            if (targetEpisode.still_path) {
-                img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
-                e.item.find('.torrent-serial__img').attr('src', img);
-            }
-
-            // Обновляем данные
-            data.title = targetEpisode.name;
-            data.fname = targetEpisode.name;
-            data.air_date = targetEpisode.air_date;
-
-            data.img = img;
-
-            console.log(`Часть ${partNumber} → Эпизод ${targetEpisodeNumber}: ${targetEpisode.name}`);
-        }
-
-    }
-
     try {
         let seasonCache = {};
 
         Lampa.Listener.follow('torrent_file', (e) => {
             if (e.type === 'list_open') {
-                seasonCache = {};
-            } else if (e.type === 'render') {
-                console.log('e', e)
-
+                seasonCache = {}; // Очистка при открытии нового списка
+            }
+            else if (e.type === 'render') {
+                let item = e.item;
                 let data = e.element;
-                let seasonNum = data.season || 1;
                 let movie = e.params.movie;
-                let episodes = [];
+                let allFiles = e.params.items; // Весь список файлов в торренте
 
-                if (seasonCache[data.folder_name]) {
-                    episodes = seasonCache[data.folder_name];
-                } else {
-                    Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
-                        console.log('tmdbData', tmdbData);
-                        if (tmdbData && tmdbData.episodes_original) {
-                            seasonCache[data.folder_name] = tmdbData.episodes_original;
-                            episodes = tmdbData.episodes_original;
-
-                            console.log('tmdbData', episodes);
-                        }
-                    }, (error) => {
-                        console.error('API error:', error);
-                    });
-                }
-
-                if (!movie || !movie.id || !data.title) return;
+                if (!movie || !movie.id || !data.title || !allFiles) return;
 
                 let fileName = data.folder_name || data.path;
+                let checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
 
-                let checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i)
-                if (checkPart)
-                    isPart(e, e.element, e.params.movie, episodes, parseInt(checkPart[1]))
+                if (checkPart) {
+                    let partNumber = parseInt(checkPart[1]);
+                    let seasonNum = data.season || 1;
+                    let cacheKey = `${movie.id}_s${seasonNum}`;
 
-                console.log('match', isPart);
+                    const applyEpisodeData = (episodes) => {
+                        let totalInTorrent = allFiles.length;
+                        let totalInTMDB = episodes.length;
+
+                        /* Логика: если в торренте файлов меньше, чем в сезоне, 
+                           считаем, что это "хвост" сезона.
+                           Пример: TMDB=20, Торрент=5. 
+                           Часть 1 торрента = 16-я серия TMDB (20 - 5 + 1)
+                        */
+                        let offset = Math.max(0, totalInTMDB - totalInTorrent);
+                        let targetEpisodeNumber = offset + partNumber;
+
+                        let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
+
+                        if (targetEpisode) {
+                            // Обновление UI
+                            item.find('.torrent-serial__title').text(targetEpisode.name);
+
+                            if (targetEpisode.air_date) {
+                                let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
+                                item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
+                            }
+
+                            let img;
+                            if (targetEpisode.still_path) {
+                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
+                                item.find('.torrent-serial__img').attr('src', img);
+                            }
+
+                            // Обновление объекта данных (для плеера)
+                            data.title = targetEpisode.name;
+                            data.fname = targetEpisode.name;
+                            data.img = img;
+                        }
+                    };
+
+                    // Проверка кэша или запрос к API
+                    if (seasonCache[cacheKey]) {
+                        applyEpisodeData(seasonCache[cacheKey]);
+                    } else {
+                        // Помечаем, что запрос в процессе, чтобы не спамить API
+                        seasonCache[cacheKey] = "loading";
+
+                        Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
+                            if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
+                                let eps = tmdbData.episodes || tmdbData.episodes_original;
+                                seasonCache[cacheKey] = eps;
+                                applyEpisodeData(eps);
+                            }
+                        }, (error) => {
+                            console.error('TMDB API Error:', error);
+                        });
+                    }
+                }
             }
         });
-    } catch (error) {
-        console.error('ОШИБКА: ', error)
+    }
+    catch (error) {
+        console.error('Plugin Error: ', error);
     }
 })();
