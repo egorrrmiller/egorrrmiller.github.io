@@ -51,11 +51,10 @@
                             Lampa.Navigator.move('right');
                         },
                         up: function () {
-                            // При нажатии "Вверх" возвращаемся в основную клавиатуру
-                            Lampa.Controller.toggle('keyboard');
+                            Lampa.Navigator.move('up');
                         },
                         down: function () {
-                            // Внизу ничего нет
+                            Lampa.Navigator.move('down');
                         },
                         back: function () {
                             Lampa.Controller.back();
