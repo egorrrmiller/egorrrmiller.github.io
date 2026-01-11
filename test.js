@@ -5,21 +5,27 @@
 
 (function () {
 
-    const regex = /(?:часть|part|pt?\.?)\s*(\d+)/i;
+    try {
+        const regex = /(?:часть|part|pt?\.?)\s*(\d+)/i;
 
-    const activity = Lampa.Activity.active();
+        const activity = Lampa.Activity.active();
 
-    const card = activity.movie;
+        const card = activity.movie;
 
 
-    console.log(card)
+        console.log(card)
 
-    Lampa.Listener.follow('torrent_file', (e) => {
+        Lampa.Listener.follow('torrent_file', (e) => {
 
-        if (e.type === 'render'){
-            e.item.find('.torrent-serial__title').text('тест тест тест');
-        }
+            if (e.type === 'render'){
+                e.item.find('.torrent-serial__title').text('тест тест тест');
+            }
 
-        console.log(e);
-    });
+            console.log(e);
+        });
+    }
+    catch (error) {
+        console.error(error)
+    }
+
 })();
