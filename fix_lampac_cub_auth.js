@@ -24,8 +24,8 @@
                         enter.which = 13;  
                         enter.keyCode = 13;
                         
-                        Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
-                        Lampa.Controller.enter();
+                        window.Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
+                        window.Lampa.Controller.enter();
                         console.log('press enter');
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
