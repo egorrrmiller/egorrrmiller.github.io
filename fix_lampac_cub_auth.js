@@ -7,28 +7,33 @@
             var keyboard = $('.simple-keyboard');
             
             // Если клавиатура на месте, а наших кнопок еще нет
-            if (keyboard.length) {
+            if (keyboard.length && !keyboard.find('.my-custom-buttons').length) {
                 
                 // Создаем блок кнопок
                 var $buttons = $(
-                    '<div class="test-buttons">' +
-                        '<div class="test-buttons__enter">Готово</div>' +
-                        '<div class="test-buttons__cancel">Отменить</div>' +
+                    '<div class="simple-keyboard-buttons my-custom-buttons">' +
+                        '<div class="simple-keyboard-buttons__enter selector" style="pointer-events: all; cursor: pointer;">Готово</div>' +
+                        '<div class="simple-keyboard-buttons__cancel selector" style="pointer-events: all; cursor: pointer;">Отменить</div>' +
                     '</div>'
                 );
 
                 // Обработчик кнопки "Готово"
-                $buttons.find('.test-buttons__enter').on('click', function (e) {
+                $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                     try {
+                        var enter = $.Event('keydown');  
+                        enter.which = 13;  
+                        enter.keyCode = 13;
+                        
+                        Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
                         Lampa.Controller.enter();
-                        console.log('Lampa Plugin: press enter');
+                        console.log('press enter');
                     } catch (err) {
                         console.error('Lampa Plugin: Error in Enter click:', err);
                     }
                 });
 
                 // Обработчик кнопки "Отменить"
-                $buttons.find('.test-buttons__cancel').on('click', function (e) {
+                $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {
                     try {
                         e.preventDefault();
                         
