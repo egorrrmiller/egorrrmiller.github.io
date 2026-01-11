@@ -65,14 +65,13 @@
                     if (seasonCache[cacheKey]) {
                         applyEpisodeData(seasonCache[cacheKey]);
                     } else {
-                        // Помечаем, что запрос в процессе, чтобы не спамить API
-                        seasonCache[cacheKey] = "loading";
-
                         Lampa.Api.sources.tmdb.get(`tv/${movie.id}/season/${seasonNum}?language=ru-RU`, {}, (tmdbData) => {
-                            if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
-                                let eps = tmdbData.episodes || tmdbData.episodes_original;
+                            if (tmdbData && (tmdbData.episodes_original)) {
+                                let eps = tmdbData.episodes_original;
                                 seasonCache[cacheKey] = eps;
                                 applyEpisodeData(eps);
+                                
+                                console.log(tmdbData);
                             }
                         }, (error) => {
                             console.error('TMDB API Error:', error);
