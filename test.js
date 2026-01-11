@@ -36,7 +36,10 @@
                            Часть 1 торрента = 16-я серия TMDB (20 - 5 + 1)
                         */
                         let offset = Math.max(0, totalInTMDB - totalInTorrent);
+                        console.log('offset', offset);
+
                         let targetEpisodeNumber = offset + partNumber;
+                        console.log('targetEpisodeNumber', targetEpisodeNumber);
 
                         let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
 
