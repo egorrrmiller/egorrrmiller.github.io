@@ -19,7 +19,6 @@
                     '</div>'
                 );
 
-                // Обработчик "Готово" (Enter)
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
                     var input = document.querySelector('.simple-keyboard-input') || document.querySelector('#orsay-keyboard');
                     if (input) {
@@ -31,44 +30,32 @@
                     }
                 });
 
-                // Обработчик "Отменить" (Back)
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
                     if (window.Lampa && window.Lampa.Controller) window.Lampa.Controller.back();
                 });
 
                 keyboard.append($buttons);
 
-                // ИНТЕГРАЦИЯ В КОНТРОЛЛЕР
+                // Регистрация для пульта
                 if (window.Lampa && window.Lampa.Controller) {
-                    // Ждем микросекунду, чтобы DOM прожевал кнопки
                     setTimeout(function() {
-                        var current = window.Lampa.Controller.enabled();
-                        
-                        // Если мы в слое клавиатуры
-                        if (current && (current.name === 'keyboard' || keyboard.is(':visible'))) {
-                            // Добавляем наши кнопки в коллекцию элементов текущего слоя
-                            current.container.find('.selector').off('hover').on('hover', function() {
-                                // Позволяем Lampa подсвечивать их при наведении
-                            });
-                            
-                            // Принудительно обновляем список доступных элементов
-                            window.Lampa.Controller.add({
-                                name: 'keyboard_buttons',
-                                selector: '.simple-keyboard-buttons .selector',
-                                layer: current.layer || 'content',
-                                parent: current,
-                                onEnter: function(el) {
-                                    $(el).trigger('click');
-                                }
-                            });
-                            
+                        try {
+                            // Просто обновляем контроллер, чтобы он увидел новые .selector
                             window.Lampa.Controller.update();
+                            
+                            // Принудительно заставляем систему "увидеть" новые элементы в текущем слое
+                            var active = window.Lampa.Controller.enabled();
+                            if (active && active.render) {
+                                active.render(); 
+                            }
+                        } catch (e) {
+                            console.log('Lampa Plugin: Controller update silent fail');
                         }
-                    }, 100);
+                    }, 150);
                 }
             }
         } catch (globalErr) {
-            console.error('Lampa Plugin Error:', globalErr);
+            console.error('Lampa Plugin Critical Error:', globalErr);
         }
     }
 
