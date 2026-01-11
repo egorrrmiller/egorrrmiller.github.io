@@ -11,8 +11,7 @@
             if (e.type === 'list_open') {
                 e.stopPropagation = true;
                 return false;
-            }
-            else if (e.type === 'render') {
+            } else if (e.type === 'render') {
                 console.log('e', e)
 
                 let html = e.item;
@@ -31,49 +30,49 @@
                 let checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
                 console.log('checkPart', checkPart);
 
-                if (checkPart) {
+                let applyEpisodeData = (episodes) => {
+                    console.log('episodes', episodes);
+                    let totalInTorrent = allFilesCount.length;
+                    let totalInTMDB = episodes.length;
 
-                    let applyEpisodeData = (episodes) => {
-                        console.log('episodes', episodes);
-                        let totalInTorrent = allFilesCount.length;
-                        let totalInTMDB = episodes.length;
+                    let targetEpisodeNumber = episode;
 
+                    if (checkPart) {
                         /* Логика: если в торренте файлов меньше, чем в сезоне,
-                           считаем, что это "хвост" сезона.
-                           Пример: TMDB=20, Торрент=5.
-                           Часть 1 торрента = 16-я серия TMDB (20 - 5 + 1)
-                        */
+                                               считаем, что это "хвост" сезона.
+                                               Пример: TMDB=20, Торрент=5.
+                                               Часть 1 торрента = 16-я серия TMDB (20 - 5 + 1)
+                                            */
                         let offset = Math.max(0, totalInTMDB - totalInTorrent);
+                        targetEpisodeNumber = offset + episode;
+
                         console.log('offset', offset);
+                    }
 
-                        let targetEpisodeNumber = offset + episode;
-                        console.log('targetEpisodeNumber', targetEpisodeNumber);
+                    let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
 
-                        let targetEpisode = episodes.find(ep => ep.episode_number === targetEpisodeNumber);
+                    if (targetEpisode) {
+                        // Обновление UI
+                        html.find('.torrent-serial__title').text(targetEpisode.name);
 
-                        if (targetEpisode) {
-                            // Обновление UI
-                            html.find('.torrent-serial__title').text(targetEpisode.name);
-
-                            if (targetEpisode.air_date) {
-                                let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
-                                html.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
-                            }
-
-                            let img;
-                            if (targetEpisode.still_path) {
-                                img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
-                                console.info('img', img)
-
-                                html.find('.torrent-serial__img').attr('src', img);
-                            }
-
-                            // Обновление объекта данных (для плеера)
-                            data.title = targetEpisode.name;
-                            data.fname = targetEpisode.name;
-                            data.img = img;
+                        if (targetEpisode.air_date) {
+                            let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
+                            html.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
                         }
-                    };
+
+                        let img;
+                        if (targetEpisode.still_path) {
+                            img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
+                            console.info('img', img)
+
+                            html.find('.torrent-serial__img').attr('src', img);
+                        }
+
+                        // Обновление объекта данных (для плеера)
+                        data.title = targetEpisode.name;
+                        data.fname = targetEpisode.name;
+                        data.img = img;
+                    }
 
                     // Проверка кэша или запрос к API
                     if (seasonCache[cacheKey]) {
@@ -94,8 +93,7 @@
                 }
             }
         });
-    }
-    catch (error) {
+    } catch (error) {
         console.error('Plugin Error: ', error);
     }
 })();
