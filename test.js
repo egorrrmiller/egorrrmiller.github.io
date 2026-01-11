@@ -1,6 +1,6 @@
 (function () {
     function getDirectTMDBImage(path, size) {
-        return `https://image.tmdb.org/t/p/${size}${path}`;
+        return `https://imagetmdb.com/t/p/${size}/${path}`;
     }
 
     try {
@@ -61,9 +61,9 @@
 
                             let img;
                             if (targetEpisode.still_path) {
-                                img = Lampa.TMDB.image(targetEpisode.still_path);
+                                img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
                                 console.info('img', img)
-                                
+
                                 html.find('.torrent-serial__img').attr('src', img);
                             }
 
