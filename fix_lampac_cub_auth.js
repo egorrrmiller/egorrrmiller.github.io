@@ -20,6 +20,10 @@
                 // Обработчик кнопки "Готово"
                 $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                     try {
+                        var enter = $.Event('keydown');  
+                        enter.which = 13;  
+                        enter.keyCode = 13;
+                        
                         Lampa.Listener.send('enter', {code: 13, enabled: true, event: enter});  
                         Lampa.Controller.enter();
                     } catch (err) {
