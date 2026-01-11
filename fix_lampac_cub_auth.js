@@ -27,15 +27,17 @@ $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
             input.focus();  
               
             // Создаем и отправляем событие на поле ввода  
-            var enterEvent = $.Event('keydown');  
+            var enterEvent = $.Event('keyup');  
             enterEvent.which = 13;  
             enterEvent.keyCode = 13;  
             enterEvent.preventDefault = function() { return false; };  
               
             input.trigger(enterEvent);  
+            window.Lampa.Controller.enter();  
+            console.log('Enter triggered on input'); 
         }  
           
-        console.log('Enter triggered on input');  
+         
     } catch (err) {  
         console.error('Lampa Plugin: Error in Enter click:', err);  
     }  
