@@ -2,53 +2,78 @@
     'use strict';
 
     function addCustomButtons() {
-        // Ищем целевой контейнер клавиатуры
         var keyboardWrap = document.querySelector('.simple-keyboard');
         
-        if (keyboardWrap) {
-            // Проверяем, нет ли уже блока с кнопками внутри
-            // (Ищем именно наш специфический класс внутри, чтобы избежать дублей)
-            var existingButtons = keyboardWrap.querySelector('.simple-keyboard-buttons');
+        // Проверяем наличие клавиатуры и что мы еще не вставили свои кнопки
+        if (keyboardWrap && !keyboardWrap.querySelector('.plugin-buttons-added')) {
             
-            if (!existingButtons) {
-                // Создаем структуру кнопок
-                var buttonsHTML = '<div class="simple-keyboard-buttons">' +
-                                    '<div class="simple-keyboard-buttons__enter">Готово</div>' +
-                                    '<div class="simple-keyboard-buttons__cancel">Отменить</div>' +
-                                  '</div>';
-                
-                // Вставляем блок в конец контейнера .simple-keyboard
-                keyboardWrap.insertAdjacentHTML('beforeend', buttonsHTML);
-                console.log('Plugin: Keyboard buttons added');
+            var buttonsHTML = '<div class="simple-keyboard-buttons plugin-buttons-added">' +
+                                '<div class="simple-keyboard-buttons__enter selector">Готово</div>' +
+                                '<div class="simple-keyboard-buttons__cancel selector">Отменить</div>' +
+                              '</div>';
+            
+            // Вставляем HTML
+            keyboardWrap.insertAdjacentHTML('beforeend', buttonsHTML);
+
+            // Находим созданные элементы, чтобы навесить на них события
+            var btnEnter = keyboardWrap.querySelector('.simple-keyboard-buttons__enter');
+            var btnCancel = keyboardWrap.querySelector('.simple-keyboard-buttons__cancel');
+
+            // Функция для имитации нажатия клавиш (понятно для Lampa)
+            var triggerKey = function(code) {
+                var event = new KeyboardEvent('keydown', {
+                    keyCode: code,
+                    which: code,
+                    bubbles: true
+                });
+                document.dispatchEvent(event);
+            };
+
+            // Обработка кнопки Готово
+            btnEnter.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                triggerKey(13); // Код Enter
+            });
+
+            // Обработка кнопки Отменить
+            btnCancel.addEventListener('click', function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                // Сначала пробуем стандартный метод закрытия ввода Lampa
+                if (window.Lampa && window.Lampa.Input) {
+                    window.Lampa.Input.close();
+                } else {
+                    triggerKey(27); // Код Escape (назад)
+                }
+            });
+
+            // ОЧЕНЬ ВАЖНО: заставляем контроллер Lampa увидеть новые кнопки
+            if (window.Lampa && window.Lampa.Controller) {
+                window.Lampa.Controller.update();
             }
+            
+            console.log('Plugin: Custom buttons initialized');
         }
     }
 
-    // Так как клавиатура в LAMPA может появляться в любой момент (динамически),
-    // используем MutationObserver для отслеживания изменений в DOM
+    // Следим за изменениями в DOM (чтобы поймать появление клавиатуры)
     var observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (mutation) {
-            if (mutation.addedNodes.length) {
+        for (var i = 0; i < mutations.length; i++) {
+            if (mutations[i].addedNodes.length) {
                 addCustomButtons();
             }
-        });
+        }
     });
 
-    // Запускаем плагин после готовности приложения
-    function startPlugin() {
+    function start() {
         if (window.appready) {
-            // Начинаем следить за всем документом
-            observer.observe(document.body, {
-                childList: true,
-                subtree: true
-            });
-            // Проверяем сразу, вдруг клавиатура уже открыта
+            observer.observe(document.body, { childList: true, subtree: true });
             addCustomButtons();
         } else {
-            setTimeout(startPlugin, 100);
+            setTimeout(start, 100);
         }
     }
 
-    startPlugin();
-
+    start();
 })();
