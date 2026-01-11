@@ -9,7 +9,7 @@
 
     const activity = Lampa.Activity.active();
 
-    const card = activity.card;
+    const card = activity.movie;
 
 
     console.log(card)
