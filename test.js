@@ -26,37 +26,50 @@
         }
     }
 
-    function patchCards(files, tmdbEpisodes){
-        files.forEach(function(node){
-            const card = $(node);
-            const fileName = card.find('.torrent-serial__title').text() || '';
-            const found = extractEpisode(fileName);
+function patchCards(files, tmdbEpisodes){
+    files.forEach(function(node){
+        const card = $(node);
+        const fileName = card.find('.torrent-serial__title').text() || '';
+        const found = extractEpisode(fileName);
 
-            let episode;
-            if(found.episode){
-                episode = tmdbEpisodes.find(e=>e.episode_number === found.episode);
-            }
+        let episode;
+        if(found.episode){
+            episode = tmdbEpisodes.find(e=>e.episode_number === found.episode);
+        }
+        if(!episode) return;
 
-            if(!episode) return;
+        // Подмена заголовка
+        card.find('.torrent-serial__title').text(episode.name || fileName);
 
-            // Подмена заголовка
-            card.find('.torrent-serial__title').text(episode.name || fileName);
+        // Дата
+        if(episode.air_date){
+            card.find('.torrent-serial__line span:nth-child(2)')
+                .text('Выход - ' + episode.air_date);
+        }
 
-            // Дата выхода
-            if(episode.air_date){
-                card.find('.torrent-serial__line span:nth-child(2)')
-                    .text('Выход - ' + episode.air_date);
-            }
+        // Обложка (гасим все внешние запросы)
+        const img = card.find('img');
 
-            // Заменить постер
-            if(episode.still_path){
-                card.find('img').attr('src', 'https://image.tmdb.org/t/p/w500' + episode.still_path);
-            }
+        // Убираем lazy-load
+        img.removeAttr('data-src');
+        img.removeClass('lazyload');
 
-            // Можно добавить описание (подсказкой)
-            card.attr('title', (episode.overview || '').trim());
-        });
-    }
+        // Гасим уже подставленный src
+        img.attr('src', '');
+
+        // Ставим изображение TMDB
+        if(episode.still_path){
+            img.attr('src', 'https://image.tmdb.org/t/p/w500' + episode.still_path);
+        } else {
+            // если TMDB пустой — ставим прозрачный пиксель
+            img.attr('src', 'data:image/gif;base64,R0lGODlhAQABAAAAACw=');
+        }
+
+        // Переносим описание в title (можно вывести в UI если надо)
+        card.attr('title', (episode.overview || '').trim());
+    });
+}
+
 
     Lampa.Listener.follow('torrent:files', async function(ev){
         const data = ev.data;
