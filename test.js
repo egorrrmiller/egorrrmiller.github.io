@@ -38,7 +38,7 @@
                 // Определяем сезон из первого элемента  
                 const firstItem = e.items[0];
                 if (firstItem) {
-                    const info = Torserver.parse({
+                    const info = Lampa.Torserver.parse({
                         movie: movie,
                         files: e.items,
                         filename: firstItem.path_human,
