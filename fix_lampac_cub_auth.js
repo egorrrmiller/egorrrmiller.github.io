@@ -1,51 +1,72 @@
 (function () {
     'use strict';
 
-    function inject() {
+    function injectCustomButtons() {
+        // Ищем контейнер клавиатуры
         var keyboard = $('.simple-keyboard');
         
-        if (keyboard.length && !keyboard.find('.my-browser-buttons').length) {
+        // Если клавиатура на месте, а наших кнопок еще нет
+        if (keyboard.length && !keyboard.find('.my-custom-buttons').length) {
             
-            // Создаем кнопки
-            var buttons = $('<div class="simple-keyboard-buttons my-browser-buttons"><div class="simple-keyboard-buttons__enter selector">Готово</div><div class="simple-keyboard-buttons__cancel selector">Отменить</div></div>');
-            
-            // Функция для отправки нажатия клавиши в браузер
-            var sendKey = function(keyCode) {
-                var e = $.Event('keydown', { keyCode: keyCode, which: keyCode, bubbles: true });
-                $(document).trigger(e);
-            };
+            // Создаем блок кнопок. 
+            // Добавляем класс 'my-custom-buttons', чтобы не дублировать
+            var $buttons = $(
+                '<div class="simple-keyboard-buttons my-custom-buttons">' +
+                    '<div class="simple-keyboard-buttons__enter selector" style="pointer-events: all;">Готово</div>' +
+                    '<div class="simple-keyboard-buttons__cancel selector" style="pointer-events: all;">Отменить</div>' +
+                '</div>'
+            );
 
-            // Кнопка Готово -> Жмем Enter
-            buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
-                var input = $('.simple-keyboard').find('input');
-                input.blur(); // Снимаем фокус
-                sendKey(13);  // Код Enter
+            // Обработчик кнопки "Готово"
+            $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
+                input.blur();
+
+                this.listener.send('enter');
+
+                console.log('Lampa Plugin: Custom Enter Triggered');
             });
 
-            // Кнопка Отменить -> Жмем Escape
-            buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                sendKey(27);  // Код Escape
+            // Обработчик кнопки "Отменить"
+            $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {
+                e.preventDefault();
+                
+                // Используем встроенный контроллер Lampa для шага "Назад"
+                if (window.Lampa && window.Lampa.Controller) {
+                    window.Lampa.Controller.back();
+                } else {
+                    // Резервный вариант - клавиша ESC
+                    var event = $.Event('keydown');
+                    event.which = 27;
+                    $(document).trigger(event);
+                }
             });
 
-            keyboard.append(buttons);
+            // Добавляем кнопки в конец контейнера клавиатуры
+            keyboard.append($buttons);
 
-            // Обновляем навигацию, чтобы кнопки были кликабельны
-            if (window.Lampa && window.Lampa.Controller && window.Lampa.Controller.update) {
+            // Оповещаем Lampa, что появились новые элементы .selector
+            if (window.Lampa && window.Lampa.Controller) {
                 window.Lampa.Controller.update();
             }
         }
     }
 
+    // Следим за появлением клавиатуры через MutationObserver
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
-            if (mutation.addedNodes.length) inject();
+            if (mutation.addedNodes.length) {
+                injectCustomButtons();
+            }
         });
     });
 
     function start() {
         if (window.appready) {
-            observer.observe(document.body, { childList: true, subtree: true });
-            inject();
+            observer.observe(document.body, {
+                childList: true,
+                subtree: true
+            });
+            injectCustomButtons();
         } else {
             setTimeout(start, 200);
         }
