@@ -23,7 +23,7 @@
             $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                 input.blur();
 
-                _this.listener.send('enter');
+                _this.onEnter();
 
                 console.log('Lampa Plugin: Custom Enter Triggered');
             });
