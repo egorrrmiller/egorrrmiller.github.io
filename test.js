@@ -5,8 +5,8 @@
 
 (function () {
 
-    function isPart(e, data, movie, episodes, partNumber) {
-
+    function isPart(e, data, movie, episodes = [], partNumber) {
+        if (!episodes || !episodes.length) return;
         // Вычисляем номер эпизода: общее кол-во - номер части
         let totalEpisodes = episodes.length;
         let targetEpisodeNumber = totalEpisodes - partNumber;
@@ -51,11 +51,11 @@
                 seasonCache = {};
             } else if (e.type === 'render') {
                 console.log('e', e)
-                
+
                 let data = e.element;
                 let seasonNum = data.season || 1;
                 let movie = e.params.movie;
-                let episodes;
+                let episodes = [];
 
                 if (seasonCache[data.folder_name]) {
                     episodes = seasonCache[data.folder_name];
@@ -65,7 +65,7 @@
                         if (tmdbData && tmdbData.episodes_original) {
                             seasonCache[data.folder_name] = tmdbData.episodes_original;
                             episodes = tmdbData.episodes_original;
-                            
+
                             console.log('tmdbData', episodes);
                         }
                     }, (error) => {
