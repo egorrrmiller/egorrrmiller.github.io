@@ -9,7 +9,8 @@
         // сюда попадем столько раз, сколько файлов в торренте
         Lampa.Listener.follow('torrent_file', (e) => {
             if (e.type === 'list_open') {
-                seasonCache = {}; // Очистка при открытии нового списка
+                e.stopPropagation = true;
+                return false;
             }
             else if (e.type === 'render') {
                 console.log('e', e)
