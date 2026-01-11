@@ -26,26 +26,16 @@ $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
             // Фокусируем поле ввода  
             input.focus();  
               
-            // Получаем значение  
-            var value = input.val();  
+            // Создаем и отправляем событие на поле ввода  
+            var enterEvent = $.Event('keydown');  
+            enterEvent.which = 13;  
+            enterEvent.keyCode = 13;  
+            enterEvent.preventDefault = function() { return false; };  
               
-            // Находим экземпляр клавиатуры  
-            var keyboard = $('.simple-keyboard');  
-            var keyboardInstance = keyboard.data('keyboard');  
-              
-            if (keyboardInstance && keyboardInstance.listener) {  
-                // Отправляем событие через listener клавиатуры  
-                keyboardInstance.listener.send('enter', {code: 13, enabled: true, value: value});  
-            } else {  
-                // Запасной вариант - глобальная отправка  
-                window.Lampa.Listener.send('enter', {code: 13, enabled: true, value: value});  
-            }  
-              
-            // Вызываем обработчик Enter  
-            window.Lampa.Controller.enter();  
+            input.trigger(enterEvent);  
         }  
           
-        console.log('Enter triggered with value:', input.val());  
+        console.log('Enter triggered on input');  
     } catch (err) {  
         console.error('Lampa Plugin: Error in Enter click:', err);  
     }  
