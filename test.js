@@ -1,7 +1,5 @@
 (function () {
     Lampa.Platform.tv();
-    
-    Lampa.Listener.remove('torrent_file');
 
     function getDirectTMDBImage(path, size) {
         return `https://imagetmdb.com/t/p/${size}/${path}`;
@@ -13,8 +11,18 @@
         // сюда попадем столько раз, сколько файлов в торренте
         Lampa.Listener.follow('torrent_file', (e) => {
             if (e.type === 'list_open') {
-                e.stopPropagation = true;
-                return false;
+                const originalModalUpdate = Lampa.Modal.update;
+
+                Lampa.Modal.update = function(html) {
+                    // Проверяем содержит ли html класс torrent-files  
+                    if (html && html.hasClass && html.hasClass('torrent-files')) {
+                            return; // Блокируем открытие
+                    }
+
+                    return originalModalUpdate.call(this, html);
+                };
+                
+                seasonCache = {};
             }
             else if (e.type === 'render') {
                 console.log('e', e)
