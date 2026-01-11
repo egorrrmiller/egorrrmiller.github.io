@@ -88,7 +88,7 @@
         Lampa.Listener.follow('torrent_file', (e) => {
             console.log('e', e)
             if (e.type === 'list_open') {
-                seasonCache = {}
+                Lampa.Listener.remove('torrent_file');
             } else if (e.type === 'render') {
 
                 setCache(e)
