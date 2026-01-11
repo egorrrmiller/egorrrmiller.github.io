@@ -1,8 +1,7 @@
 (function () {
     'use strict';
 
-    // --- 1. СТИЛИЗАЦИЯ (Как в твоем примере) ---
-    // Добавляем стили для контейнера. Сами кнопки используют стандартный стиль Lampa.
+    // СТИЛИ (Оставляем те же, красивые и видимые)
     var css = `
         .keyboard-actions-footer {
             display: flex;
@@ -12,11 +11,10 @@
             margin-top: 0.5em;
         }
         .keyboard-actions-footer .simple-button {
-            margin: 0 1em; /* Расстояние между кнопками */
+            margin: 0 1em;
             min-width: 140px;
             text-align: center;
         }
-        /* Яркий фокус для ТВ, чтобы точно видеть, где курсор */
         .keyboard-actions-footer .selector.focus {
             background-color: white !important;
             color: black !important;
@@ -29,11 +27,9 @@
 
     function inject() {
         var keyboard = $('.simple-keyboard');
-
-        // Проверяем, чтобы не дублировать кнопки
         if (keyboard.length && !keyboard.find('.keyboard-actions-footer').length) {
 
-            // --- 2. СОЗДАНИЕ HTML (Структура как в modal__footer) ---
+            // СОЗДАНИЕ КНОПОК
             var $footer = $('<div class="keyboard-actions-footer"></div>');
             var $btnEnter = $('<div class="simple-button selector">Готово</div>');
             var $btnCancel = $('<div class="simple-button selector">Отменить</div>');
@@ -42,74 +38,77 @@
             $footer.append($btnCancel);
             keyboard.append($footer);
 
-            // --- 3. ЛОГИКА "ENTER" (ОТПРАВКА ДАННЫХ) ---
+            // --- ИСПРАВЛЕНИЕ 1: Правильный поиск инпута ---
             var doEnter = function() {
-                var input = document.activeElement;
-                
-                // 1. Снимаем фокус с инпута (важно для Tizen/WebOS)
-                if (input && input.tagName === 'INPUT') {
-                    input.blur();
+                try {
+                    // Ищем инпут явно по классу клавиатуры Lampa, а не по activeElement
+                    var input = document.querySelector('.simple-keyboard-input') || document.querySelector('input');
+                    
+                    if (input) {
+                        console.log('Lampa Plugin: Sending Enter to input', input);
+                        
+                        var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
+                        
+                        // 1. Отправляем событие прямо в инпут
+                        input.dispatchEvent(new KeyboardEvent('keydown', eventParams));
+                        input.dispatchEvent(new KeyboardEvent('keyup', eventParams));
+                        
+                        // 2. Отправляем событие глобально (на случай, если слушатель на window)
+                        document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
+                        
+                        // 3. Закрываем клавиатуру (опционально, многие плагины ждут этого)
+                        // Lampa.Controller.toggle('content'); 
+                    } else {
+                        console.error('Lampa Plugin: Input not found!');
+                    }
+                } catch (e) {
+                    console.error('Lampa Plugin: Enter Error', e);
                 }
-
-                // 2. Эмулируем нажатие физической клавиши Enter
-                var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                document.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-                document.dispatchEvent(new KeyboardEvent('keyup', eventParams));
-                
-                // 3. На всякий случай отправляем событие прямо в инпут
-                if (input) {
-                    input.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-                    input.dispatchEvent(new KeyboardEvent('keyup', eventParams));
-                }
-
-                console.log('Lampa Plugin: Action "Enter" executed');
             };
 
-            // --- 4. СОБЫТИЯ (Как в примере: hover:enter) ---
-            
-            // Кнопка "Готово"
-            $btnEnter.on('hover:enter click', function() {
-                doEnter();
-            });
+            $btnEnter.on('hover:enter click', doEnter);
 
-            // Кнопка "Отменить"
             $btnCancel.on('hover:enter click', function() {
-                if (window.Lampa && Lampa.Controller) {
-                    Lampa.Controller.back();
-                }
+                if (window.Lampa && Lampa.Controller) Lampa.Controller.back();
             });
 
-            // --- 5. КОНТРОЛЛЕР НАВИГАЦИИ (Имитация Lampa.Modal) ---
+            // --- ИСПРАВЛЕНИЕ 2: Ручная навигация (без Script Error) ---
             if (window.Lampa && Lampa.Controller) {
-                
-                // Создаем контроллер специально для наших кнопок
                 Lampa.Controller.add('keyboard_plugins_ctrl', {
                     toggle: function() {
-                        // При активации указываем Лампе, что кнопки находятся в нашем футере
                         Lampa.Controller.collectionSet($footer);
-                        // Ставим фокус на первую кнопку ("Готово")
                         Lampa.Controller.collectionFocus($btnEnter[0], $footer);
                     },
                     up: function() {
-                        // При нажатии ВВЕРХ возвращаем управление клавиатуре
                         Lampa.Controller.toggle('keyboard');
                     },
-                    // Влево/Вправо работает автоматически по классу .selector,
-                    // но для надежности дублируем стандартный метод
-                    left: function() { Lampa.Navigator.move('left'); },
-                    right: function() { Lampa.Navigator.move('right'); },
+                    // ВМЕСТО Lampa.Navigator.move ПРОПИСЫВАЕМ ПЕРЕХОДЫ ВРУЧНУЮ
+                    left: function() {
+                        // Если мы на "Отменить", идем на "Готово"
+                        if (document.activeElement === $btnCancel[0]) {
+                            Lampa.Controller.collectionFocus($btnEnter[0], $footer);
+                        }
+                    },
+                    right: function() {
+                        // Если мы на "Готово", идем на "Отменить"
+                        if (document.activeElement === $btnEnter[0]) {
+                            Lampa.Controller.collectionFocus($btnCancel[0], $footer);
+                        }
+                    },
                     back: function() { Lampa.Controller.back(); }
                 });
 
-                // --- 6. МОСТ МЕЖДУ ИНПУТОМ И КНОПКАМИ ---
-                // Самая важная часть: перехватываем нажатие "ВНИЗ" на инпуте
+                // Перехват кнопки "ВНИЗ"
                 $(document).off('keydown.kb_plugin').on('keydown.kb_plugin', function(e) {
-                    if (e.keyCode === 40) { // Код кнопки "Вниз"
+                    if (e.keyCode === 40) { 
                         var active = document.activeElement;
-                        // Если фокус сейчас в поле ввода
-                        if (active && active.tagName === 'INPUT') {
-                            // Принудительно переключаем управление на наши кнопки
-                            Lampa.Controller.toggle('keyboard_plugins_ctrl');
+                        // Проверяем, что мы в инпуте, либо в области самой клавиатуры (буквы)
+                        if (active && (active.tagName === 'INPUT' || $(active).closest('.simple-keyboard').length)) {
+                            // Если нажали вниз внутри клавиатуры - переходим на кнопки
+                            // Проверяем, не на кнопках ли мы уже (чтобы не зациклить)
+                            if (!$(active).closest('.keyboard-actions-footer').length) {
+                                Lampa.Controller.toggle('keyboard_plugins_ctrl');
+                            }
                         }
                     }
                 });
@@ -117,21 +116,13 @@
         }
     }
 
-    // --- СЛЕЖЕНИЕ ЗА ОТКРЫТИЕМ КЛАВИАТУРЫ ---
     var observer = new MutationObserver(function (mutations) {
-        mutations.forEach(function (mutation) {
-            if (mutation.addedNodes.length) {
-                if ($('.simple-keyboard').length) {
-                    inject();
-                }
-            }
-        });
+        if ($('.simple-keyboard').length) inject();
     });
 
     function start() {
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
-            // Если клавиатура уже открыта при старте плагина
             if ($('.simple-keyboard').length) inject();
         } else {
             setTimeout(start, 200);
