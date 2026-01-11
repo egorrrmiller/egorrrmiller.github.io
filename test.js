@@ -17,9 +17,7 @@
                 let data = e.element;
                 let movie = e.params.movie;
 
-                console.log('item', item);
-                console.log('data', data);
-                console.log('movie', movie);
+                console.log('e', e);
 
                 if (!movie || !movie.id || !data.title) return;
 
@@ -53,9 +51,9 @@
                                 let date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
                                 item.find('.torrent-serial__line span:last').text(`Выход - ${date}`);
                             }
-
+                            let img;
                             if (targetEpisode.still_path) {
-                                let img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
+                                img = Lampa.TMDB.image(targetEpisode.still_path, 'w500');
                                 item.find('.torrent-serial__img').attr('src', img);
                             }
 
@@ -63,7 +61,8 @@
                             data.title = targetEpisode.name;
                             data.fname = targetEpisode.name;
                             data.air_date = targetEpisode.air_date;
-                            //data.img = img;
+
+                            data.img = img;
 
                             console.log(`Часть ${partNumber} → Эпизод ${targetEpisodeNumber}: ${targetEpisode.name}`);
                         }
