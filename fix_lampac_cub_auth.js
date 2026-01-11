@@ -1,96 +1,73 @@
 (function () {
     'use strict';
 
-    // 1. Стили как в твоем примере (modal__footer + selector)
+    // 1. ПОДМЕНА PLATFORM.SCREEN (Тот самый обман)
+    var originalScreen = Lampa.Platform.screen;
+    Lampa.Platform.screen = function (name) {
+        // Когда Лампа спрашивает про mobile, мы всегда говорим true
+        if (name === 'mobile') return true;
+        return originalScreen(name);
+    };
+
+    // 2. СТИЛИ (Для фокуса пульта)
     var css = `
-        .keyboard-actions-footer {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 1.2em;
-            background: rgba(0,0,0,0.1);
-            margin-top: 5px;
-            border-top: 1px solid rgba(255,255,255,0.05);
-        }
-        .keyboard-actions-footer .simple-button {
-            margin: 0 0.5em;
-            min-width: 150px;
-            text-align: center;
-        }
-        /* Стиль фокуса как в стандартной Лампе */
-        .keyboard-actions-footer .selector.focus {
+        .simple-keyboard-buttons .selector.focus {
             background-color: white !important;
             color: black !important;
-            border-radius: 0.3em;
+            transform: scale(1.05);
+        }
+        /* Чуть поправим мобильные кнопки для ТВ, чтобы они выглядели лучше */
+        .simple-keyboard-buttons {
+            background: rgba(255,255,255,0.05);
+            padding: 10px !important;
         }
     `;
-    if (!$('style#kb-custom-style').length) $('head').append('<style id="kb-custom-style">' + css + '</style>');
+    if (!$('style#kb-trick-style').length) $('head').append('<style id="kb-trick-style">' + css + '</style>');
 
-    function inject() {
-        var keyboard = $('.simple-keyboard');
+    // 3. ОБРАБОТКА ПОЯВЛЕНИЯ КНОПОК
+    function patchNativeButtons() {
+        var $footer = $('.simple-keyboard-buttons');
         
-        // Проверка: добавляем только если еще нет кнопок
-        if (keyboard.length && !keyboard.find('.keyboard-actions-footer').length) {
-            
-            // 2. Создаем HTML структуру, идентичную твоему примеру
-            var $footer = $('<div class="keyboard-actions-footer"></div>');
-            var $btnEnter = $('<div class="simple-button selector">Готово</div>');
-            var $btnCancel = $('<div class="simple-button selector">Отменить</div>');
+        // Если родные кнопки появились, но у них еще нет класса .selector
+        if ($footer.length && !$footer.find('.selector').length) {
+            var $btnEnter = $footer.find('.simple-keyboard-buttons__enter');
+            var $btnCancel = $footer.find('.simple-keyboard-buttons__cancel');
 
-            $footer.append($btnEnter).append($btnCancel);
-            keyboard.append($footer);
+            // Добавляем класс .selector, чтобы пульт мог их фокусировать
+            $btnEnter.addClass('selector');
+            $btnCancel.addClass('selector');
 
-            // 3. Логика кнопок через hover:enter (как в твоем примере)
-            $btnEnter.on('hover:enter', function() {
-                // Код для триггера события Enter из памяти
-                var input = document.querySelector('.simple-keyboard-input') || document.querySelector('input');
-                if (input) {
-                    var eventParams = { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true };
-                    input.dispatchEvent(new KeyboardEvent('keydown', eventParams));
-                    console.log('Plugin: Enter event triggered');
-                }
-            });
+            // Перенаправляем события пульта на события клика (которые Лампа уже создала)
+            $btnEnter.on('hover:enter', function() { $(this).click(); });
+            $btnCancel.on('hover:enter', function() { $(this).click(); });
 
-            $btnCancel.on('hover:enter', function() {
-                // Вместо закрытия модалки, имитируем "Назад"
-                Lampa.Controller.back();
-            });
-
-            // 4. Регистрация контроллера (аналог того, что Lampa.Modal делает внутри себя)
+            // Регистрируем управление
             if (window.Lampa && Lampa.Controller) {
-                Lampa.Controller.add('keyboard_btns_plugin', {
+                Lampa.Controller.add('kb_native_footer', {
                     toggle: function() {
-                        // Указываем набор кнопок для управления
                         Lampa.Controller.collectionSet($footer);
-                        // Ставим фокус на "Готово"
                         Lampa.Controller.collectionFocus($btnEnter[0], $footer);
-                    },
-                    // Ручное управление влево/вправо для исключения ScriptError
-                    right: function() {
-                        Lampa.Controller.collectionFocus($btnCancel[0], $footer);
                     },
                     left: function() {
                         Lampa.Controller.collectionFocus($btnEnter[0], $footer);
                     },
-                    // Возврат вверх к буквам клавиатуры
+                    right: function() {
+                        Lampa.Controller.collectionFocus($btnCancel[0], $footer);
+                    },
                     up: function() {
                         Lampa.Controller.toggle('keyboard');
                     },
-                    // Исправленный Back (без рекурсии)
                     back: function() {
-                        Lampa.Controller.toggle('keyboard');
                         Lampa.Controller.back();
                     }
                 });
 
-                // 5. Перехват кнопки "Вниз" на буквах клавиатуры
-                $(document).off('keydown.kb_plugin_nav').on('keydown.kb_plugin_nav', function(e) {
+                // Слушаем "Вниз" на клавиатуре, чтобы перейти к этим кнопкам
+                $(document).off('keydown.kb_native').on('keydown.kb_native', function(e) {
                     if (e.keyCode === 40) { // Down
                         var active = document.activeElement;
-                        // Если мы на инпуте или внутри клавиш букв
                         if (active && (active.tagName === 'INPUT' || $(active).closest('.simple-keyboard__keys').length)) {
-                            // Переключаем управление на наши кнопки
-                            Lampa.Controller.toggle('keyboard_btns_plugin');
+                            Lampa.Controller.toggle('kb_native_footer');
                         }
                     }
                 });
@@ -98,15 +75,14 @@
         }
     }
 
-    // Слежение за DOM (открытие клавиатуры)
+    // Следим за DOM
     var observer = new MutationObserver(function (mutations) {
-        if ($('.simple-keyboard').length) inject();
+        if ($('.simple-keyboard-buttons').length) patchNativeButtons();
     });
 
     function start() {
         if (window.appready && window.Lampa) {
             observer.observe(document.body, { childList: true, subtree: true });
-            if ($('.simple-keyboard').length) inject();
         } else {
             setTimeout(start, 200);
         }
