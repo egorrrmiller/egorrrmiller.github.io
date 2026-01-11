@@ -6,16 +6,19 @@
             if (e.type === 'list_open') {
                 seasonCache = {}; // Очистка при открытии нового списка
             }
-            else if (e.type === 'render') {
+            else if (e.type === 'render') {                
                 let item = e.item;
                 let data = e.element;
                 let movie = e.params.movie;
                 let allFiles = e.params.items; // Весь список файлов в торренте
+                
+                console.log('e', e)
 
                 if (!movie || !movie.id || !data.title || !allFiles) return;
 
                 let fileName = data.folder_name || data.path;
                 let checkPart = fileName.match(/(?:часть|part|pt?\.?)\s*(\d+)/i);
+                console.log('checkPart', checkPart);
 
                 if (checkPart) {
                     let partNumber = parseInt(checkPart[1]);
@@ -26,9 +29,9 @@
                         let totalInTorrent = allFiles.length;
                         let totalInTMDB = episodes.length;
 
-                        /* Логика: если в торренте файлов меньше, чем в сезоне, 
+                        /* Логика: если в торренте файлов меньше, чем в сезоне,
                            считаем, что это "хвост" сезона.
-                           Пример: TMDB=20, Торрент=5. 
+                           Пример: TMDB=20, Торрент=5.
                            Часть 1 торрента = 16-я серия TMDB (20 - 5 + 1)
                         */
                         let offset = Math.max(0, totalInTMDB - totalInTorrent);
