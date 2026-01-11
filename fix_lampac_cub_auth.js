@@ -4,45 +4,38 @@
     function inject() {
         var keyboard = $('.simple-keyboard');
         
-        // Если клавиатура есть, а кнопок еще нет
-        if (keyboard.length && !keyboard.find('.my-added-buttons').length) {
+        if (keyboard.length && !keyboard.find('.my-browser-buttons').length) {
             
-            var Lang = Lampa.Lang;
-            var Controller = Lampa.Controller;
+            // Создаем кнопки
+            var buttons = $('<div class="simple-keyboard-buttons my-browser-buttons"><div class="simple-keyboard-buttons__enter selector">Готово</div><div class="simple-keyboard-buttons__cancel selector">Отменить</div></div>');
+            
+            // Функция для отправки нажатия клавиши в браузер
+            var sendKey = function(keyCode) {
+                var e = $.Event('keydown', { keyCode: keyCode, which: keyCode, bubbles: true });
+                $(document).trigger(e);
+            };
 
-            // 1. Создаем кнопки (ТВОЙ КОД)
-            // Добавим класс my-added-buttons, чтобы избежать повторов
-            var buttons = $('<div class="simple-keyboard-buttons my-added-buttons"><div class="simple-keyboard-buttons__enter">' + Lang.translate('ready') + '</div><div class="simple-keyboard-buttons__cancel">' + Lang.translate('cancel') + '</div></div>');
-            
-            // 2. Вешаем обработчики (ТВОЙ КОД)
-            // Переменные _this и input определяются ВНУТРИ клика, чтобы не вешать окно при загрузке
+            // Кнопка Готово -> Жмем Enter
             buttons.find('.simple-keyboard-buttons__enter').on('click', function () {
-                var _this = Lampa.Input.active();
-                var input = $('.simple-keyboard').find('#orsay-keyboard');
-                
-                input.blur();
-
-                _this.listener.send('enter');
+                var input = $('.simple-keyboard').find('input');
+                input.blur(); // Снимаем фокус
+                sendKey(13);  // Код Enter
             });
-            
+
+            // Кнопка Отменить -> Жмем Escape
             buttons.find('.simple-keyboard-buttons__cancel').on('click', function () {
-                var _this = Lampa.Input.active();
-                
-                _this.value('');
-
-                Controller.back();
+                sendKey(27);  // Код Escape
             });
 
-            // 3. Вставляем (ТВОЙ КОД)
-            $('.simple-keyboard').append(buttons);
+            keyboard.append(buttons);
 
-            // Добавляем селекторы для работы навигации
-            buttons.find('div').addClass('selector');
-            if (Controller.update) Controller.update();
+            // Обновляем навигацию, чтобы кнопки были кликабельны
+            if (window.Lampa && window.Lampa.Controller && window.Lampa.Controller.update) {
+                window.Lampa.Controller.update();
+            }
         }
     }
 
-    // Слушатель изменений DOM
     var observer = new MutationObserver(function (mutations) {
         mutations.forEach(function (mutation) {
             if (mutation.addedNodes.length) inject();
@@ -50,7 +43,7 @@
     });
 
     function start() {
-        if (window.appready && window.Lampa) {
+        if (window.appready) {
             observer.observe(document.body, { childList: true, subtree: true });
             inject();
         } else {
