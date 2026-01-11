@@ -45,14 +45,8 @@ $buttons.find('.simple-keyboard-buttons__enter').on('click', function (e) {
                 $buttons.find('.simple-keyboard-buttons__cancel').on('click', function (e) {  
                     try {  
                         e.preventDefault();  
-                          
-                        if (window.Lampa && window.Lampa.Controller) {  
-                            window.Lampa.Controller.back();  
-                        } else {  
-                            var event = $.Event('keydown');  
-                            event.which = 27; // Esc  
-                            $(document).trigger(event);  
-                        }  
+                          window.Lampa.Controller.back();  
+                        
                     } catch (err) {  
                         console.error('Lampa Plugin: Error in Cancel click:', err);  
                     }  
