@@ -35,9 +35,16 @@
                 // 2. Фикс поиска (Query = search_one + search_two)
                 if (activity.component === 'torrents' && activity.search_one && activity.search_two) {
                     var newQuery = activity.search_one + ' ' + activity.search_two;
+                    
+                    // Обновляем Query в URL
                     e.params.url = e.params.url.replace(/([?&]Query=)([^&]*)/, function(match, prefix, oldValue) {
                         return prefix + encodeURIComponent(newQuery);
                     });
+
+                    // Обновляем отображаемый поисковый запрос в активности, если нужно
+                    if (activity.search !== newQuery) {
+                        activity.search = newQuery;
+                    }
                 }
             }
         }
