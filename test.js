@@ -29,12 +29,18 @@
                 var html = e.item;
                 var data = e.element;
                 var movie = e.params.movie;
-                var allFilesCount = e.items.length;
+                
+                // Считаем только видеофайлы для корректного offset
+                var videoFiles = e.items.filter(function(item){
+                    var ext = (item.path || '').split('.').pop().toLowerCase();
+                    return ['mkv', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'webm', 'm4v'].indexOf(ext) !== -1;
+                });
+                var allFilesCount = videoFiles.length;
 
                 if (!movie || !movie.id) return;
 
                 var seasonNum = data.season || 1;
-                var episodeNum = parseInt(data.episode); // Принудительно в число
+                var episodeNum = parseInt(data.episode);
 
                 var fileName = data.folder_name || data.path;
                 var checkPart = fileName.match(/(?:часть|part|pt?\.?|ep?\.?|s\d+e|эпизод)\s*(\d+)/i);
@@ -47,12 +53,11 @@
                     fileName: fileName,
                     seasonNum: seasonNum,
                     episodeNum: episodeNum,
-                    checkPart: checkPart,
-                    dataEpisode: data.episode
+                    allFilesCount: allFilesCount,
+                    totalItems: e.items.length
                 });
 
                 if (isNaN(episodeNum)) {
-                    console.log('TT: Skip item, no episode num');
                     return;
                 }
 
@@ -61,15 +66,7 @@
                 var lineElem = html.find('.torrent-serial__line');
                 var imgElem = html.find('.torrent-serial__img');
 
-                console.log('TT: DOM Elements found', {
-                    title: titleElem.length,
-                    line: lineElem.length,
-                    img: imgElem.length
-                });
-
                 var applyData = function (episodes) {
-                    console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
-
                     if (!episodes || !episodes.length) {
                         titleElem.removeClass('ts-hidden');
                         lineElem.removeClass('ts-hidden');
@@ -83,15 +80,18 @@
 
                     console.log('TT: Direct find', targetEpisode);
 
-                    // Логика offset отключена по умолчанию, так как она опасна для онгоингов.
-                    // Если нужно, раскомментируйте или добавьте условие.
-                    /*
+                    // Если прямое совпадение не найдено, пробуем offset
                     if (!targetEpisode) {
                         var totalInTMDB = episodes.length;
                         var offset = Math.max(0, totalInTMDB - allFilesCount);
                         var targetEpisodeNumber = offset + episodeNum;
                         
-                        console.log('TT: Offset calc', { totalInTMDB: totalInTMDB, allFilesCount: allFilesCount, offset: offset, targetEpisodeNumber: targetEpisodeNumber });
+                        console.log('TT: Offset calc', { 
+                            totalInTMDB: totalInTMDB, 
+                            allFilesCount: allFilesCount, 
+                            offset: offset, 
+                            targetEpisodeNumber: targetEpisodeNumber 
+                        });
 
                         targetEpisode = episodes.find(function (ep) {
                             return ep.episode_number === targetEpisodeNumber;
@@ -99,11 +99,8 @@
                         
                         console.log('TT: Offset find', targetEpisode);
                     }
-                    */
 
                     if (targetEpisode) {
-                        console.log('TT: Updating DOM for', targetEpisode.name);
-                        
                         titleElem.text(targetEpisode.name);
 
                         if (targetEpisode.air_date) {
@@ -122,8 +119,6 @@
 
                         data.title = targetEpisode.name;
                         data.fname = targetEpisode.name;
-                    } else {
-                        console.log('TT: Episode not found in TMDB data');
                     }
 
                     requestAnimationFrame(function() {
@@ -137,11 +132,9 @@
                 var episodesData = null;
 
                 if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
-                    console.log('TT: Data from params');
                     hasData = true;
                     episodesData = e.params.seasons[seasonNum].episodes;
                 } else if (seasonCache[cacheKey]) {
-                    console.log('TT: Data from cache');
                     hasData = true;
                     episodesData = seasonCache[cacheKey];
                 }
@@ -149,13 +142,11 @@
                 if (hasData) {
                     applyData(episodesData);
                 } else {
-                    console.log('TT: Fetching data');
                     titleElem.addClass('ts-hidden');
                     lineElem.addClass('ts-hidden');
                     imgElem.addClass('ts-hidden');
 
                     Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
-                        console.log('TT: API success', tmdbData);
                         if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                             var eps = tmdbData.episodes || tmdbData.episodes_original;
                             seasonCache[cacheKey] = eps;
@@ -164,7 +155,6 @@
                             applyData(null);
                         }
                     }, function (error) {
-                        console.log('TT: API error', error);
                         applyData(null);
                     });
                 }
