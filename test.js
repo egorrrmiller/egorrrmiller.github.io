@@ -1,6 +1,11 @@
 (function () {
     'use strict';
 
+    // Добавляем стили для плавности
+    var style = document.createElement('style');
+    style.innerHTML = '.torrent-serial__title, .torrent-serial__line, .torrent-serial__img { transition: opacity 0.3s ease; } .ts-hidden { opacity: 0; }';
+    document.head.appendChild(style);
+
     function getDirectTMDBImage(path, size) {
         return 'https://imagetmdb.com/t/p/' + size + '/' + path;
     }
@@ -18,11 +23,9 @@
 
             if (!movie || !movie.id) return;
 
-            // Пытаемся определить номер сезона и эпизода
             var seasonNum = data.season || 1;
             var episodeNum = data.episode;
 
-            // Если эпизод не определен Lampa, пробуем вытащить из имени файла
             var fileName = data.folder_name || data.path;
             var checkPart = fileName.match(/(?:часть|part|pt?\.?|ep?\.?)\s*(\d+)/i);
             
@@ -30,25 +33,27 @@
                 episodeNum = parseInt(checkPart[1]);
             }
 
-            if (!episodeNum) return; // Не смогли определить номер эпизода
+            if (!episodeNum) return;
 
             var cacheKey = movie.id + '_s' + seasonNum;
+            var titleElem = html.find('.torrent-serial__title');
+            var lineElem = html.find('.torrent-serial__line');
+            var imgElem = html.find('.torrent-serial__img');
 
-            // Функция применения данных к элементу
+            // Функция применения данных
             var applyData = function (episodes) {
-                if (!episodes || !episodes.length) return;
+                if (!episodes || !episodes.length) {
+                    // Если данных нет, показываем как есть
+                    titleElem.removeClass('ts-hidden');
+                    lineElem.removeClass('ts-hidden');
+                    imgElem.removeClass('ts-hidden');
+                    return;
+                }
 
-                // Логика смещения (offset)
-                // Если файлов в торренте меньше, чем эпизодов в сезоне, считаем, что это конец сезона
-                // Но это работает только если файлы идут подряд.
-                // Если это просто папка с сериями, то offset может быть лишним, если нумерация совпадает.
-                // Попробуем найти эпизод напрямую по номеру.
-                
                 var targetEpisode = episodes.find(function (ep) {
                     return ep.episode_number === episodeNum;
                 });
 
-                // Если не нашли напрямую, пробуем логику со смещением (для сквозной нумерации или частей)
                 if (!targetEpisode) {
                     var totalInTMDB = episodes.length;
                     var offset = Math.max(0, totalInTMDB - allFilesCount);
@@ -60,69 +65,67 @@
                 }
 
                 if (targetEpisode) {
-                    // Обновляем UI
-                    html.find('.torrent-serial__title').text(targetEpisode.name);
+                    // Обновляем данные
+                    titleElem.text(targetEpisode.name);
 
                     if (targetEpisode.air_date) {
                         var date = Lampa.Utils.parseTime(targetEpisode.air_date).full;
-                        var line = html.find('.torrent-serial__line');
-                        // Ищем span с датой или добавляем
-                        if(line.find('span').length > 1) line.find('span').last().text('Выход - ' + date);
-                        else line.append('<span>Выход - ' + date + '</span>');
+                        if(lineElem.find('span').length > 1) lineElem.find('span').last().text('Выход - ' + date);
+                        else lineElem.append('<span>Выход - ' + date + '</span>');
                     }
 
                     if (targetEpisode.still_path) {
                         var img = getDirectTMDBImage(targetEpisode.still_path, 'w300');
-                        var imgElem = html.find('.torrent-serial__img');
-                        
-                        // Меняем картинку только если она отличается
                         if(imgElem.attr('src') !== img){
                             imgElem.attr('src', img);
-                            // Обновляем данные для плеера
                             data.img = img;
                         }
                     }
 
-                    // Обновляем название для плеера
                     data.title = targetEpisode.name;
                     data.fname = targetEpisode.name;
-                    
-                    // Показываем элемент (если скрывали)
-                    html.css('opacity', 1);
-                } else {
-                    // Если эпизод не найден, просто показываем как есть
-                    html.css('opacity', 1);
                 }
+
+                // Плавно показываем
+                requestAnimationFrame(function() {
+                    titleElem.removeClass('ts-hidden');
+                    lineElem.removeClass('ts-hidden');
+                    imgElem.removeClass('ts-hidden');
+                });
             };
 
-            // Скрываем элемент, чтобы избежать мигания при асинхронной загрузке
-            // Но если данные есть синхронно, скрывать не обязательно, но для единообразия можно
-            // html.css('opacity', 0); 
-            // Лучше не скрывать полностью, а то будет пустота. Пусть лучше обновится.
-            // Но пользователь жаловался на "скачки".
-            
-            // Проверяем, есть ли данные о сезонах уже в params (Lampa их загрузила)
+            // Проверяем наличие данных
+            var hasData = false;
+            var episodesData = null;
+
             if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
-                applyData(e.params.seasons[seasonNum].episodes);
-            } 
-            // Проверяем наш кэш
-            else if (seasonCache[cacheKey]) {
-                applyData(seasonCache[cacheKey]);
-            } 
-            // Загружаем
-            else {
-                // Чтобы не мигало, можно скрыть текст или поставить заглушку?
-                // Нет, лучше пусть пользователь видит хоть что-то (имя файла), чем пустоту.
-                // Но если мы хотим "идеально", то можно html.addClass('loading-info') и стилизовать.
-                
+                hasData = true;
+                episodesData = e.params.seasons[seasonNum].episodes;
+            } else if (seasonCache[cacheKey]) {
+                hasData = true;
+                episodesData = seasonCache[cacheKey];
+            }
+
+            if (hasData) {
+                // Если данные есть сразу, применяем их без скрытия (или с очень быстрым обновлением)
+                applyData(episodesData);
+            } else {
+                // Если данных нет, скрываем элементы, чтобы не было скачка текста
+                titleElem.addClass('ts-hidden');
+                lineElem.addClass('ts-hidden');
+                imgElem.addClass('ts-hidden');
+
                 Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
                     if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                         var eps = tmdbData.episodes || tmdbData.episodes_original;
                         seasonCache[cacheKey] = eps;
                         applyData(eps);
+                    } else {
+                        // Если не удалось загрузить, показываем исходное
+                        applyData(null);
                     }
                 }, function (error) {
-                    // Ошибка, оставляем как есть
+                    applyData(null);
                 });
             }
         }
