@@ -1,7 +1,6 @@
 (function () {
     'use strict';
 
-    // Добавляем стили для плавности
     var style = document.createElement('style');
     style.innerHTML = '.torrent-serial__title, .torrent-serial__line, .torrent-serial__img { transition: opacity 0.3s ease; } .ts-hidden { opacity: 0; }';
     document.head.appendChild(style);
@@ -14,6 +13,7 @@
 
     Lampa.Listener.follow('torrent_file', function (e) {
         if (e.type === 'list_open') {
+            console.log('TT: list_open', e);
             seasonCache = {};
         } else if (e.type === 'render') {
             var html = e.item;
@@ -33,17 +33,28 @@
                 episodeNum = parseInt(checkPart[1]);
             }
 
-            if (!episodeNum) return;
+            console.log('TT: Render item', {
+                fileName: fileName,
+                seasonNum: seasonNum,
+                episodeNum: episodeNum,
+                checkPart: checkPart,
+                dataEpisode: data.episode
+            });
+
+            if (!episodeNum) {
+                console.log('TT: Skip item, no episode num');
+                return;
+            }
 
             var cacheKey = movie.id + '_s' + seasonNum;
             var titleElem = html.find('.torrent-serial__title');
             var lineElem = html.find('.torrent-serial__line');
             var imgElem = html.find('.torrent-serial__img');
 
-            // Функция применения данных
             var applyData = function (episodes) {
+                console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
+
                 if (!episodes || !episodes.length) {
-                    // Если данных нет, показываем как есть
                     titleElem.removeClass('ts-hidden');
                     lineElem.removeClass('ts-hidden');
                     imgElem.removeClass('ts-hidden');
@@ -54,18 +65,23 @@
                     return ep.episode_number === episodeNum;
                 });
 
+                console.log('TT: Direct find', targetEpisode);
+
                 if (!targetEpisode) {
                     var totalInTMDB = episodes.length;
                     var offset = Math.max(0, totalInTMDB - allFilesCount);
                     var targetEpisodeNumber = offset + episodeNum;
                     
+                    console.log('TT: Offset calc', { totalInTMDB: totalInTMDB, allFilesCount: allFilesCount, offset: offset, targetEpisodeNumber: targetEpisodeNumber });
+
                     targetEpisode = episodes.find(function (ep) {
                         return ep.episode_number === targetEpisodeNumber;
                     });
+                    
+                    console.log('TT: Offset find', targetEpisode);
                 }
 
                 if (targetEpisode) {
-                    // Обновляем данные
                     titleElem.text(targetEpisode.name);
 
                     if (targetEpisode.air_date) {
@@ -86,7 +102,6 @@
                     data.fname = targetEpisode.name;
                 }
 
-                // Плавно показываем
                 requestAnimationFrame(function() {
                     titleElem.removeClass('ts-hidden');
                     lineElem.removeClass('ts-hidden');
@@ -94,37 +109,38 @@
                 });
             };
 
-            // Проверяем наличие данных
             var hasData = false;
             var episodesData = null;
 
             if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
+                console.log('TT: Data from params');
                 hasData = true;
                 episodesData = e.params.seasons[seasonNum].episodes;
             } else if (seasonCache[cacheKey]) {
+                console.log('TT: Data from cache');
                 hasData = true;
                 episodesData = seasonCache[cacheKey];
             }
 
             if (hasData) {
-                // Если данные есть сразу, применяем их без скрытия (или с очень быстрым обновлением)
                 applyData(episodesData);
             } else {
-                // Если данных нет, скрываем элементы, чтобы не было скачка текста
+                console.log('TT: Fetching data');
                 titleElem.addClass('ts-hidden');
                 lineElem.addClass('ts-hidden');
                 imgElem.addClass('ts-hidden');
 
                 Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
+                    console.log('TT: API success', tmdbData);
                     if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                         var eps = tmdbData.episodes || tmdbData.episodes_original;
                         seasonCache[cacheKey] = eps;
                         applyData(eps);
                     } else {
-                        // Если не удалось загрузить, показываем исходное
                         applyData(null);
                     }
                 }, function (error) {
+                    console.log('TT: API error', error);
                     applyData(null);
                 });
             }
