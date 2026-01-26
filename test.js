@@ -34,12 +34,12 @@
                 if (!movie || !movie.id) return;
 
                 var seasonNum = data.season || 1;
-                var episodeNum = data.episode;
+                var episodeNum = parseInt(data.episode); // Принудительно в число
 
                 var fileName = data.folder_name || data.path;
-                var checkPart = fileName.match(/(?:часть|part|pt?\.?|ep?\.?)\s*(\d+)/i);
+                var checkPart = fileName.match(/(?:часть|part|pt?\.?|ep?\.?|s\d+e|эпизод)\s*(\d+)/i);
                 
-                if (!episodeNum && checkPart && checkPart[1]) {
+                if (isNaN(episodeNum) && checkPart && checkPart[1]) {
                     episodeNum = parseInt(checkPart[1]);
                 }
 
@@ -51,7 +51,7 @@
                     dataEpisode: data.episode
                 });
 
-                if (!episodeNum) {
+                if (isNaN(episodeNum)) {
                     console.log('TT: Skip item, no episode num');
                     return;
                 }
@@ -60,6 +60,12 @@
                 var titleElem = html.find('.torrent-serial__title');
                 var lineElem = html.find('.torrent-serial__line');
                 var imgElem = html.find('.torrent-serial__img');
+
+                console.log('TT: DOM Elements found', {
+                    title: titleElem.length,
+                    line: lineElem.length,
+                    img: imgElem.length
+                });
 
                 var applyData = function (episodes) {
                     console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
@@ -77,6 +83,9 @@
 
                     console.log('TT: Direct find', targetEpisode);
 
+                    // Логика offset отключена по умолчанию, так как она опасна для онгоингов.
+                    // Если нужно, раскомментируйте или добавьте условие.
+                    /*
                     if (!targetEpisode) {
                         var totalInTMDB = episodes.length;
                         var offset = Math.max(0, totalInTMDB - allFilesCount);
@@ -90,8 +99,11 @@
                         
                         console.log('TT: Offset find', targetEpisode);
                     }
+                    */
 
                     if (targetEpisode) {
+                        console.log('TT: Updating DOM for', targetEpisode.name);
+                        
                         titleElem.text(targetEpisode.name);
 
                         if (targetEpisode.air_date) {
@@ -110,6 +122,8 @@
 
                         data.title = targetEpisode.name;
                         data.fname = targetEpisode.name;
+                    } else {
+                        console.log('TT: Episode not found in TMDB data');
                     }
 
                     requestAnimationFrame(function() {
