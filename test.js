@@ -46,6 +46,29 @@
                 console.log('TMDB Plugin: New URL', e.params.url);
             } else {
                 console.log('TMDB Plugin: No currentMovieId to append');
+                
+                // Попытка получить ID из активности
+                var activity = Lampa.Activity.active();
+                console.log('TMDB Plugin: Current Activity:', activity);
+                
+                if (activity && activity.component === 'full' && activity.card && activity.card.id) {
+                     // Дополнительная проверка, чтобы убедиться, что запрос соответствует текущей карточке
+                     // Например, проверяем наличие оригинального названия в URL
+                     var match = e.params.url.match(/title_original=([^&]+)/);
+                     if(match && match[1]){
+                         var urlTitle = decodeURIComponent(match[1]).toLowerCase();
+                         var cardTitle = (activity.card.original_title || activity.card.original_name || '').toLowerCase();
+                         
+                         // Простая проверка на вхождение, так как названия могут немного отличаться
+                         if(urlTitle === cardTitle || cardTitle.indexOf(urlTitle) > -1 || urlTitle.indexOf(cardTitle) > -1){
+                             console.log('TMDB Plugin: Found ID from Activity:', activity.card.id);
+                             e.params.url = Lampa.Utils.addUrlComponent(e.params.url, 'tmdb=' + activity.card.id);
+                             console.log('TMDB Plugin: New URL (from Activity)', e.params.url);
+                         } else {
+                             console.log('TMDB Plugin: Activity card title mismatch', urlTitle, cardTitle);
+                         }
+                     }
+                }
             }
         }
     });
