@@ -51,22 +51,32 @@
                 var activity = Lampa.Activity.active();
                 console.log('TMDB Plugin: Current Activity:', activity);
                 
-                if (activity && activity.component === 'full' && activity.card && activity.card.id) {
+                var movie = null;
+                
+                if(activity.component === 'full' && activity.card) movie = activity.card;
+                if(activity.component === 'torrents' && activity.movie) movie = activity.movie;
+                
+                if (movie && movie.id) {
                      // Дополнительная проверка, чтобы убедиться, что запрос соответствует текущей карточке
                      // Например, проверяем наличие оригинального названия в URL
                      var match = e.params.url.match(/title_original=([^&]+)/);
                      if(match && match[1]){
                          var urlTitle = decodeURIComponent(match[1]).toLowerCase();
-                         var cardTitle = (activity.card.original_title || activity.card.original_name || '').toLowerCase();
+                         var cardTitle = (movie.original_title || movie.original_name || '').toLowerCase();
                          
                          // Простая проверка на вхождение, так как названия могут немного отличаться
                          if(urlTitle === cardTitle || cardTitle.indexOf(urlTitle) > -1 || urlTitle.indexOf(cardTitle) > -1){
-                             console.log('TMDB Plugin: Found ID from Activity:', activity.card.id);
-                             e.params.url = Lampa.Utils.addUrlComponent(e.params.url, 'tmdb=' + activity.card.id);
+                             console.log('TMDB Plugin: Found ID from Activity:', movie.id);
+                             e.params.url = Lampa.Utils.addUrlComponent(e.params.url, 'tmdb=' + movie.id);
                              console.log('TMDB Plugin: New URL (from Activity)', e.params.url);
                          } else {
                              console.log('TMDB Plugin: Activity card title mismatch', urlTitle, cardTitle);
                          }
+                     } else {
+                         // Если в URL нет title_original, но мы в активности торрентов, скорее всего это тот самый фильм
+                         console.log('TMDB Plugin: No title_original in URL, but assuming correct movie from activity');
+                         e.params.url = Lampa.Utils.addUrlComponent(e.params.url, 'tmdb=' + movie.id);
+                         console.log('TMDB Plugin: New URL (from Activity)', e.params.url);
                      }
                 }
             }
