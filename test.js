@@ -1,52 +1,84 @@
 (function () {
     'use strict';
 
-    Lampa.Listener.follow('request_before', function (e) {
-        // Проверяем, что это запрос к Jackett
-        if (e.params.url && e.params.url.indexOf('/api/v2.0/indexers/') !== -1 && e.params.url.indexOf('/results') !== -1) {
-            var activity = Lampa.Activity.active();
-            var movie = null;
+    function applyScale() {
+        var scale = Lampa.Storage.field('interface_scale_custom');
+        
+        // Если значение не задано или "Отключено" (пустая строка), ничего не делаем
+        if (!scale || scale === '') return;
 
-            if (activity.component === 'full' && activity.card) movie = activity.card;
-            if (activity.component === 'torrents' && activity.movie) movie = activity.movie;
+        var fs = parseFloat(scale);
+        if (isNaN(fs)) return;
 
-            if (movie) {
-                // 1. Добавляем TMDB ID
-                if (movie.id) {
-                    var match = e.params.url.match(/title_original=([^&]+)/);
-                    var shouldAddId = false;
+        // Формула из layer.js: Math.max(window.innerWidth / 84.17 * fs, 10.6)
+        var size = Math.max(window.innerWidth / 84.17 * fs, 10.6);
+        
+        $('body').css('font-size', size + 'px');
+        console.log('Interface Scale Plugin: Applied scale', fs, 'Resulting font-size:', size);
+    }
 
-                    if (match && match[1]) {
-                        var urlTitle = decodeURIComponent(match[1]).toLowerCase();
-                        var cardTitle = (movie.original_title || movie.original_name || '').toLowerCase();
+    // Добавляем параметр в настройки
+    Lampa.Settings.listener.follow('open', function (e) {
+        if (e.name == 'interface') {
+            var field = {
+                title: 'Кастомный масштаб',
+                type: 'select',
+                name: 'interface_scale_custom',
+                values: {
+                    '': 'Отключено',
+                    '0.5': '0.5',
+                    '0.6': '0.6',
+                    '0.7': '0.7',
+                    '0.75': '0.75',
+                    '0.8': '0.8',
+                    '0.85': '0.85',
+                    '0.9': '0.9',
+                    '0.95': '0.95',
+                    '1.0': '1.0',
+                    '1.1': '1.1',
+                    '1.2': '1.2',
+                    '1.3': '1.3',
+                    '1.5': '1.5'
+                },
+                default: ''
+            };
 
-                        if (urlTitle === cardTitle || cardTitle.indexOf(urlTitle) > -1 || urlTitle.indexOf(cardTitle) > -1) {
-                            shouldAddId = true;
-                        }
-                    } else {
-                        shouldAddId = true;
-                    }
-
-                    if (shouldAddId) {
-                        e.params.url = Lampa.Utils.addUrlComponent(e.params.url, 'tmdb=' + movie.id);
-                    }
-                }
-
-                // 2. Фикс поиска (Query = search_one + search_two)
-                if (activity.component === 'torrents' && activity.search_one && activity.search_two) {
-                    var newQuery = activity.search_one + ' ' + activity.search_two;
-                    
-                    // Обновляем Query в URL
-                    e.params.url = e.params.url.replace(/([?&]Query=)([^&]*)/, function(match, prefix, oldValue) {
-                        return prefix + encodeURIComponent(newQuery);
-                    });
-
-                    // Обновляем отображаемый поисковый запрос в активности, если нужно
-                    if (activity.search !== newQuery) {
-                        activity.search = newQuery;
-                    }
-                }
+            var item = Lampa.SettingsApi.createParam(field);
+            
+            // Пытаемся вставить после стандартной настройки размера
+            var target = e.body.find('[data-name="interface_size"]');
+            if (target.length) {
+                target.after(item);
+            } else {
+                // Если не нашли, добавляем в конец списка параметров
+                e.body.find('.settings-param').last().after(item);
             }
         }
     });
+
+    // Слушаем изменение настройки
+    Lampa.Storage.listener.follow('change', function (e) {
+        if (e.name == 'interface_scale_custom') {
+            applyScale();
+        }
+    });
+
+    // Слушаем ресайз окна. 
+    // В layer.js стоит таймаут 100мс. Ставим 200мс, чтобы перебить его.
+    $(window).on('resize', function () {
+        setTimeout(applyScale, 200);
+    });
+
+    // Применяем при старте
+    // Ждем инициализации Lampa
+    var waitLoad = setInterval(function(){
+        if(window.Lampa && ($('body').hasClass('size--normal') || $('body').hasClass('size--small') || $('body').hasClass('size--bigger'))){
+            clearInterval(waitLoad);
+            applyScale();
+        }
+    }, 200);
+    
+    // На всякий случай через секунду тоже
+    setTimeout(applyScale, 1000);
+
 })();
