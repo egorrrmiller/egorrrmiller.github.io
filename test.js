@@ -2,17 +2,49 @@
     'use strict';
 
     var lastInputType = 'key';
+    var scrollTimer;
 
-    // Отслеживаем движение мыши
-    // Используем capture фазу, чтобы поймать событие раньше всех
-    window.addEventListener('mousemove', function() {
+    // Добавляем стиль для отключения ховера при скролле
+    var style = document.createElement('style');
+    style.innerHTML = '.disable-hover, .disable-hover * { pointer-events: none !important; }';
+    document.head.appendChild(style);
+
+    function setMouse() {
         lastInputType = 'mouse';
-    }, true);
+    }
 
-    // Отслеживаем нажатие кнопок (пульт/клавиатура)
+    // Отслеживаем движение мыши и колесо
+    window.addEventListener('mousemove', setMouse, true);
+    window.addEventListener('wheel', setMouse, true);
+    window.addEventListener('mousedown', setMouse, true);
+
+    // Отслеживаем нажатие кнопок
     window.addEventListener('keydown', function() {
         lastInputType = 'key';
     }, true);
+
+    // Блокируем ховер во время скролла
+    window.addEventListener('scroll', function() {
+        if (lastInputType === 'mouse') {
+            document.body.classList.add('disable-hover');
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function() {
+                document.body.classList.remove('disable-hover');
+            }, 500);
+        }
+    }, true);
+    
+    // Также ловим wheel, так как scroll может не срабатывать на некоторых элементах или при кастомном скролле
+    window.addEventListener('wheel', function() {
+        if (lastInputType === 'mouse') {
+            document.body.classList.add('disable-hover');
+            clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(function() {
+                document.body.classList.remove('disable-hover');
+            }, 500);
+        }
+    }, true);
+
 
     // Ждем загрузки Lampa
     var waitLoad = setInterval(function(){
@@ -25,24 +57,22 @@
     function init() {
         console.log('Mouse Control Plugin: Init');
 
-        // Сохраняем оригинальный метод обновления скролла
         var originalUpdate = Lampa.Scroll.prototype.update;
 
-        // Переопределяем метод
         Lampa.Scroll.prototype.update = function(element, immediate) {
-            // Если последнее действие было мышкой, блокируем авто-скролл
             if (lastInputType === 'mouse') {
-                // Мы не вызываем оригинальный метод, поэтому сдвига не происходит.
-                // Элемент получит фокус (класс focus), но контейнер не сдвинется.
                 return;
             }
-
-            // Если управление с пульта/клавиатуры — работаем как обычно
             return originalUpdate.apply(this, arguments);
         };
-
-        // Дополнительно: фикс для колесика мыши
-        // В Lampa колесико иногда перехватывается неправильно.
-        // Но блокировка Scroll.update обычно решает главную проблему "убегания".
+        
+        var originalWheel = Lampa.Scroll.prototype.wheel;
+        Lampa.Scroll.prototype.wheel = function(size) {
+             
+             if (lastInputType === 'mouse' && !Lampa.Platform.screen('tv')) {
+                 return;
+             }
+             return originalWheel.apply(this, arguments);
+        };
     }
 })();
