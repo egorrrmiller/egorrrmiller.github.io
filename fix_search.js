@@ -2,6 +2,7 @@
     'use strict';
 
     // Добавляем настройку
+    /*
     Lampa.Settings.listener.follow('open', function (e) {
         if (e.name == 'parser') {
             var item = $(`
@@ -22,6 +23,7 @@
             Lampa.Params.bind(item);
         }
     });
+    */
 
     Lampa.Listener.follow('request_before', function (e) {
         // Проверяем, что это запрос к Jackett
