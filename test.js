@@ -78,18 +78,14 @@
                 var filePath = data.path || '';
                 var fileName = filePath.split('/').pop();
                 
-                // Детект Part 2 в имени файла
                 var isPart2 = isPart2Global || !!fileName.match(/(?:part|часть|cour)\s*[-.]?\s*2/i);
 
-                // Поиск номера серии
-                // Игнорируем "Part 2" при поиске цифры, чтобы не найти 2
                 var cleanName = fileName.replace(/(?:part|часть|cour)\s*[-.]?\s*2/ig, '');
                 
                 var checkPart = cleanName.match(/(?:e|ep|эп|серия)\s*(\d+)/i) || cleanName.match(/(?:^|\s|\[|\()(\d+)(?:\]|\)|\s|\.)/);
                 
                 if (checkPart && checkPart[1]) {
                     var parsedNum = parseInt(checkPart[1]);
-                    // Если Lampa нашла 2 (из Part 2), а мы нашли другое число, или Lampa ничего не нашла
                     if (isNaN(episodeNum) || (isPart2 && episodeNum === 2 && parsedNum !== 2)) {
                          episodeNum = parsedNum;
                     } else if (isNaN(episodeNum)) {
@@ -118,6 +114,14 @@
                 var imgElem = html.find('.torrent-serial__img');
 
                 var applyData = function (episodes) {
+                    console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
+                    
+                    // Логируем эпизоды для отладки
+                    if (episodes && episodes.length > 0) {
+                        console.log('TT: Episodes list (first 3):', episodes.slice(0, 3));
+                        console.log('TT: Episodes list (last 3):', episodes.slice(-3));
+                    }
+
                     if (!episodes || !episodes.length) {
                         titleElem.removeClass('ts-hidden');
                         lineElem.removeClass('ts-hidden');
@@ -139,6 +143,9 @@
                                 return ep.episode_number === targetNum;
                             });
                             if (targetEpisode) console.log('TT: Found via Part 2 Offset:', targetEpisode.name);
+                        } else if (totalInTMDB < 20 && isPart2) {
+                             // Если серий мало (12), а это Part 2, значит Lampa загрузила не тот сезон или не все серии?
+                             console.log('TT: Warning! Part 2 detected but total episodes count is low:', totalInTMDB);
                         }
                     }
 
@@ -193,9 +200,11 @@
                 var episodesData = null;
 
                 if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
+                    console.log('TT: Data from params');
                     hasData = true;
                     episodesData = e.params.seasons[seasonNum].episodes;
                 } else if (seasonCache[cacheKey]) {
+                    console.log('TT: Data from cache');
                     hasData = true;
                     episodesData = seasonCache[cacheKey];
                 }
@@ -203,11 +212,13 @@
                 if (hasData) {
                     applyData(episodesData);
                 } else {
+                    console.log('TT: Fetching data for season', seasonNum);
                     titleElem.addClass('ts-hidden');
                     lineElem.addClass('ts-hidden');
                     imgElem.addClass('ts-hidden');
 
                     Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
+                        console.log('TT: API success');
                         if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                             var eps = tmdbData.episodes || tmdbData.episodes_original;
                             seasonCache[cacheKey] = eps;
@@ -216,6 +227,7 @@
                             applyData(null);
                         }
                     }, function (error) {
+                        console.log('TT: API error', error);
                         applyData(null);
                     });
                 }
