@@ -115,12 +115,6 @@
 
                 var applyData = function (episodes) {
                     console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
-                    
-                    // Логируем эпизоды для отладки
-                    if (episodes && episodes.length > 0) {
-                        console.log('TT: Episodes list (first 3):', episodes.slice(0, 3));
-                        console.log('TT: Episodes list (last 3):', episodes.slice(-3));
-                    }
 
                     if (!episodes || !episodes.length) {
                         titleElem.removeClass('ts-hidden');
@@ -143,9 +137,6 @@
                                 return ep.episode_number === targetNum;
                             });
                             if (targetEpisode) console.log('TT: Found via Part 2 Offset:', targetEpisode.name);
-                        } else if (totalInTMDB < 20 && isPart2) {
-                             // Если серий мало (12), а это Part 2, значит Lampa загрузила не тот сезон или не все серии?
-                             console.log('TT: Warning! Part 2 detected but total episodes count is low:', totalInTMDB);
                         }
                     }
 
@@ -200,9 +191,15 @@
                 var episodesData = null;
 
                 if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
-                    console.log('TT: Data from params');
-                    hasData = true;
                     episodesData = e.params.seasons[seasonNum].episodes;
+                    // Проверка на неполные данные для Part 2
+                    if (isPart2 && episodesData.length < 20) {
+                        console.log('TT: Data incomplete for Part 2 (only ' + episodesData.length + ' eps). Force reload.');
+                        hasData = false;
+                    } else {
+                        console.log('TT: Data from params');
+                        hasData = true;
+                    }
                 } else if (seasonCache[cacheKey]) {
                     console.log('TT: Data from cache');
                     hasData = true;
@@ -217,8 +214,10 @@
                     lineElem.addClass('ts-hidden');
                     imgElem.addClass('ts-hidden');
 
+                    // Запрашиваем данные. Если на русском мало серий, можно попробовать fallback на английский,
+                    // но пока просто перезапросим, вдруг кэш протух.
                     Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
-                        console.log('TT: API success');
+                        console.log('TT: API success', tmdbData);
                         if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                             var eps = tmdbData.episodes || tmdbData.episodes_original;
                             seasonCache[cacheKey] = eps;
