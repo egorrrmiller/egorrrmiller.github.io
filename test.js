@@ -35,14 +35,14 @@
                 var activity = Lampa.Activity.active();
                 if (activity && activity.component === 'torrents' && activity.object && activity.object.title) {
                     var title = activity.object.title;
+                    console.log('TT: Torrent Title:', title);
                     
-                    // Сезон
                     var matchSeason = title.match(/(?:season|сезон|s)\s*:?\s*(\d+)/i);
                     if (matchSeason && matchSeason[1]) {
                         torrentSeason = parseInt(matchSeason[1]);
+                        console.log('TT: Detected season:', torrentSeason);
                     }
 
-                    // Смещение (явное)
                     var matchOffset = title.match(/(?:offset|start)\s*:?\s*(\d+)/i);
                     if (matchOffset && matchOffset[1]) {
                         var val = parseInt(matchOffset[1]);
@@ -51,12 +51,12 @@
                         } else {
                             torrentOffset = val;
                         }
+                        console.log('TT: Detected offset:', torrentOffset);
                     }
 
-                    // Авто-детект "Часть 2"
                     if (title.match(/(?:part|часть|cour)\s*2/i)) {
                         isPart2 = true;
-                        console.log('TT: Detected Part 2');
+                        console.log('TT: Detected Part 2 flag');
                     }
                 }
             } else if (e.type === 'render') {
@@ -86,6 +86,14 @@
                     episodeNum += torrentOffset;
                 }
 
+                console.log('TT: Render item', {
+                    fileName: fileName,
+                    seasonNum: seasonNum,
+                    episodeNum: episodeNum,
+                    isPart2: isPart2,
+                    allFilesCount: allFilesCount
+                });
+
                 if (isNaN(episodeNum)) return;
 
                 var cacheKey = movie.id + '_s' + seasonNum;
@@ -94,6 +102,8 @@
                 var imgElem = html.find('.torrent-serial__img');
 
                 var applyData = function (episodes) {
+                    console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
+
                     if (!episodes || !episodes.length) {
                         titleElem.removeClass('ts-hidden');
                         lineElem.removeClass('ts-hidden');
@@ -104,36 +114,38 @@
                     var targetEpisode = null;
                     var totalInTMDB = episodes.length;
 
-                    // 1. Если это Part 2, пробуем найти эпизод во второй половине
+                    // 1. Part 2 Logic
                     if (isPart2 && torrentOffset === 0) {
-                        // Предполагаем, что Part 2 - это вторая половина
-                        // Вычисляем offset как разницу, если файлов меньше чем серий
                         var autoOffset = Math.max(0, totalInTMDB - allFilesCount);
+                        console.log('TT: Part 2 Logic. Total:', totalInTMDB, 'Files:', allFilesCount, 'Offset:', autoOffset);
                         
-                        // Если offset > 0 (значит это хвост), пробуем применить его
                         if (autoOffset > 0) {
                             var targetNum = autoOffset + episodeNum;
                             targetEpisode = episodes.find(function (ep) {
                                 return ep.episode_number === targetNum;
                             });
-                            if (targetEpisode) console.log('TT: Part 2 Auto-Offset applied', autoOffset);
+                            if (targetEpisode) console.log('TT: Found via Part 2 Offset:', targetEpisode.name);
+                            else console.log('TT: Not found via Part 2 Offset');
                         }
                     }
 
-                    // 2. Если не нашли (или не Part 2), ищем напрямую
+                    // 2. Direct Logic
                     if (!targetEpisode) {
                         targetEpisode = episodes.find(function (ep) {
                             return ep.episode_number === episodeNum;
                         });
+                        if (targetEpisode) console.log('TT: Found via Direct:', targetEpisode.name);
                     }
 
-                    // 3. Если не нашли напрямую, пробуем обычный авто-offset (для хвостов без метки Part 2)
+                    // 3. Tail Logic
                     if (!targetEpisode && torrentOffset === 0) {
                         var offset = Math.max(0, totalInTMDB - allFilesCount);
+                        console.log('TT: Tail Logic. Offset:', offset);
                         if (offset > 0) {
                              targetEpisode = episodes.find(function (ep) {
                                 return ep.episode_number === offset + episodeNum;
                             });
+                            if (targetEpisode) console.log('TT: Found via Tail Offset:', targetEpisode.name);
                         }
                     }
 
@@ -156,6 +168,8 @@
 
                         data.title = targetEpisode.name;
                         data.fname = targetEpisode.name;
+                    } else {
+                        console.log('TT: Episode NOT FOUND');
                     }
 
                     requestAnimationFrame(function() {
@@ -169,9 +183,11 @@
                 var episodesData = null;
 
                 if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
+                    console.log('TT: Data from params');
                     hasData = true;
                     episodesData = e.params.seasons[seasonNum].episodes;
                 } else if (seasonCache[cacheKey]) {
+                    console.log('TT: Data from cache');
                     hasData = true;
                     episodesData = seasonCache[cacheKey];
                 }
@@ -179,11 +195,13 @@
                 if (hasData) {
                     applyData(episodesData);
                 } else {
+                    console.log('TT: Fetching data for season', seasonNum);
                     titleElem.addClass('ts-hidden');
                     lineElem.addClass('ts-hidden');
                     imgElem.addClass('ts-hidden');
 
                     Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
+                        console.log('TT: API success');
                         if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                             var eps = tmdbData.episodes || tmdbData.episodes_original;
                             seasonCache[cacheKey] = eps;
@@ -192,6 +210,7 @@
                             applyData(null);
                         }
                     }, function (error) {
+                        console.log('TT: API error', error);
                         applyData(null);
                     });
                 }
