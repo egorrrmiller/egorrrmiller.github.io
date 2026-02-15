@@ -22,7 +22,7 @@
         var seasonCache = {};
         var torrentSeason = null;
         var torrentOffset = 0;
-        var isPart2 = false;
+        var isPart2Global = false;
 
         Lampa.Listener.follow('torrent_file', function (e) {
             if (e.type === 'list_open') {
@@ -30,7 +30,7 @@
                 seasonCache = {};
                 torrentSeason = null;
                 torrentOffset = 0;
-                isPart2 = false;
+                isPart2Global = false;
 
                 var activity = Lampa.Activity.active();
                 if (activity && activity.component === 'torrents' && activity.object && activity.object.title) {
@@ -55,8 +55,8 @@
                     }
 
                     if (title.match(/(?:part|часть|cour)\s*2/i)) {
-                        isPart2 = true;
-                        console.log('TT: Detected Part 2 flag');
+                        isPart2Global = true;
+                        console.log('TT: Detected Part 2 flag (Global)');
                     }
                 }
             } else if (e.type === 'render') {
@@ -75,11 +75,26 @@
                 var seasonNum = data.season || torrentSeason || 1;
                 var episodeNum = parseInt(data.episode);
 
-                var fileName = data.folder_name || data.path;
-                var checkPart = fileName.match(/(?:часть|part|pt?\.?|ep?\.?|s\d+e|эпизод)\s*(\d+)/i);
+                var filePath = data.path || '';
+                var fileName = filePath.split('/').pop();
                 
-                if (isNaN(episodeNum) && checkPart && checkPart[1]) {
-                    episodeNum = parseInt(checkPart[1]);
+                // Детект Part 2 в имени файла
+                var isPart2 = isPart2Global || !!fileName.match(/(?:part|часть|cour)\s*[-.]?\s*2/i);
+
+                // Поиск номера серии
+                // Игнорируем "Part 2" при поиске цифры, чтобы не найти 2
+                var cleanName = fileName.replace(/(?:part|часть|cour)\s*[-.]?\s*2/ig, '');
+                
+                var checkPart = cleanName.match(/(?:e|ep|эп|серия)\s*(\d+)/i) || cleanName.match(/(?:^|\s|\[|\()(\d+)(?:\]|\)|\s|\.)/);
+                
+                if (checkPart && checkPart[1]) {
+                    var parsedNum = parseInt(checkPart[1]);
+                    // Если Lampa нашла 2 (из Part 2), а мы нашли другое число, или Lampa ничего не нашла
+                    if (isNaN(episodeNum) || (isPart2 && episodeNum === 2 && parsedNum !== 2)) {
+                         episodeNum = parsedNum;
+                    } else if (isNaN(episodeNum)) {
+                        episodeNum = parsedNum;
+                    }
                 }
 
                 if (!isNaN(episodeNum) && torrentOffset > 0) {
@@ -88,6 +103,7 @@
 
                 console.log('TT: Render item', {
                     fileName: fileName,
+                    cleanName: cleanName,
                     seasonNum: seasonNum,
                     episodeNum: episodeNum,
                     isPart2: isPart2,
@@ -102,8 +118,6 @@
                 var imgElem = html.find('.torrent-serial__img');
 
                 var applyData = function (episodes) {
-                    console.log('TT: applyData', { episodesCount: episodes ? episodes.length : 0 });
-
                     if (!episodes || !episodes.length) {
                         titleElem.removeClass('ts-hidden');
                         lineElem.removeClass('ts-hidden');
@@ -125,7 +139,6 @@
                                 return ep.episode_number === targetNum;
                             });
                             if (targetEpisode) console.log('TT: Found via Part 2 Offset:', targetEpisode.name);
-                            else console.log('TT: Not found via Part 2 Offset');
                         }
                     }
 
@@ -140,7 +153,6 @@
                     // 3. Tail Logic
                     if (!targetEpisode && torrentOffset === 0) {
                         var offset = Math.max(0, totalInTMDB - allFilesCount);
-                        console.log('TT: Tail Logic. Offset:', offset);
                         if (offset > 0) {
                              targetEpisode = episodes.find(function (ep) {
                                 return ep.episode_number === offset + episodeNum;
@@ -168,8 +180,6 @@
 
                         data.title = targetEpisode.name;
                         data.fname = targetEpisode.name;
-                    } else {
-                        console.log('TT: Episode NOT FOUND');
                     }
 
                     requestAnimationFrame(function() {
@@ -183,11 +193,9 @@
                 var episodesData = null;
 
                 if (e.params.seasons && e.params.seasons[seasonNum] && e.params.seasons[seasonNum].episodes) {
-                    console.log('TT: Data from params');
                     hasData = true;
                     episodesData = e.params.seasons[seasonNum].episodes;
                 } else if (seasonCache[cacheKey]) {
-                    console.log('TT: Data from cache');
                     hasData = true;
                     episodesData = seasonCache[cacheKey];
                 }
@@ -195,13 +203,11 @@
                 if (hasData) {
                     applyData(episodesData);
                 } else {
-                    console.log('TT: Fetching data for season', seasonNum);
                     titleElem.addClass('ts-hidden');
                     lineElem.addClass('ts-hidden');
                     imgElem.addClass('ts-hidden');
 
                     Lampa.Api.sources.tmdb.get('tv/' + movie.id + '/season/' + seasonNum + '?language=' + Lampa.Storage.get('language','ru'), {}, function (tmdbData) {
-                        console.log('TT: API success');
                         if (tmdbData && (tmdbData.episodes || tmdbData.episodes_original)) {
                             var eps = tmdbData.episodes || tmdbData.episodes_original;
                             seasonCache[cacheKey] = eps;
@@ -210,7 +216,6 @@
                             applyData(null);
                         }
                     }, function (error) {
-                        console.log('TT: API error', error);
                         applyData(null);
                     });
                 }
