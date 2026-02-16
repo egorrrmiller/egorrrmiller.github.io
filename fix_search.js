@@ -32,8 +32,8 @@
             // Убираем параметр year из запроса
             e.params.url = e.params.url.replace(/([?&])year=[^&]*&?/, '$1').replace(/&$/, '');
 
-            /*
-            // Логика добавления TMDB ID (закомментирована)
+            
+            // Логика добавления TMDB ID
             if (Lampa.Storage.field('parser_use_tmdb_id')) {
                 var activity = Lampa.Activity.active();
                 var movie = null;
@@ -58,7 +58,6 @@
                     }
                 }
             }
-            */
         }
     });
 })();
