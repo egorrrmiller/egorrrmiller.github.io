@@ -93,7 +93,7 @@
 
         u += '&force_search=true';
 
-        Lampa.Noty.show('Начат принудительный поиск');
+        Lampa.Noty.show('Начат принудительный поиск на трекерах');
 
         $.ajax({
             url: u,
