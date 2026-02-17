@@ -42,8 +42,18 @@
         var movie = activity.movie;
         var query = activity.search;
 
-        var url = Lampa.Storage.field('jackett_url');
-        var key = Lampa.Storage.field('jackett_key');
+        // Выбор ссылки (one/two)
+        var useLink = Lampa.Storage.field('parser_use_link');
+        var url, key;
+
+        if (useLink == 'two') {
+            url = Lampa.Storage.field('jackett_url_two');
+            key = Lampa.Storage.field('jackett_key_two');
+        } else {
+            url = Lampa.Storage.field('jackett_url');
+            key = Lampa.Storage.field('jackett_key');
+        }
+
         var interview = Lampa.Storage.field('jackett_interview') == 'healthy' ? 'status:healthy' : 'all';
 
         if (!url || !key) {
@@ -56,7 +66,6 @@
         var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
         console.log('SS: Base URL:', u);
 
-        var cats;
         if (movie) {
             try {
                 u += '&title=' + encodeURIComponent(movie.title);
@@ -72,14 +81,13 @@
 
                 var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
                 console.log('SS: Category:', cat);
-                cats = '&Category[]=' + cat;
+                u += '&Category[]=' + cat;
             } catch (e) {
                 console.error('SS: Error building URL params', e);
             }
         }
 
         u += '&force_search=true';
-        u += cats;
 
         console.log('SS: Final URL:', u);
         Lampa.Noty.show('Начат принудительный поиск');
