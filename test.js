@@ -1,14 +1,21 @@
 (function () {
     'use strict';
 
-    // Перехват запросов
+    // Добавляем стили для анимации
+    var style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes spin-force { 100% { transform: rotate(360deg); } }
+        .filter--reload.loading svg { animation: spin-force 1s linear infinite; }
+        .filter--reload.disabled { opacity: 0.5; pointer-events: none; }
+    `;
+    document.head.appendChild(style);
+
     Lampa.Listener.follow('request_before', function (e) {
         if (e.params.url && e.params.url.indexOf('/api/v2.0/indexers/') !== -1 && e.params.url.indexOf('/results') !== -1) {
             e.params.url = e.params.url.replace(/([?&])year=[^&]*&?/, '$1').replace(/&$/, '');
         }
     });
 
-    // Добавляем кнопку перезагрузки
     Lampa.Listener.follow('activity', function (e) {
         if (e.type === 'start' && e.component === 'torrents') {
             var waitFilter = setInterval(function(){
@@ -29,20 +36,22 @@
                     filter.find('.filter--sort').after(btn);
 
                     btn.on('hover:enter', function () {
-                        forceSearch();
+                        forceSearch(btn);
                     });
                 }
             }, 200);
         }
     });
 
-    function forceSearch() {
-        console.log('SS: Force Search started');
+    function forceSearch(btn) {
+        // Блокируем кнопку и запускаем анимацию
+        if (btn.hasClass('disabled')) return;
+        btn.addClass('loading disabled');
+
         var activity = Lampa.Activity.active();
         var movie = activity.movie;
         var query = activity.search;
 
-        // Выбор ссылки (one/two)
         var useLink = Lampa.Storage.field('parser_use_link');
         var url, key;
 
@@ -58,13 +67,13 @@
 
         if (!url || !key) {
             Lampa.Noty.show('Jackett не настроен');
+            btn.removeClass('loading disabled');
             return;
         }
 
         url = Lampa.Utils.checkEmptyUrl(url);
 
         var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
-        console.log('SS: Base URL:', u);
 
         if (movie) {
             try {
@@ -80,23 +89,18 @@
                 }
 
                 var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
-                console.log('SS: Category:', cat);
                 u += '&Category[]=' + cat;
-            } catch (e) {
-                console.error('SS: Error building URL params', e);
-            }
+            } catch (e) {}
         }
 
         u += '&force_search=true';
 
-        console.log('SS: Final URL:', u);
         Lampa.Noty.show('Начат принудительный поиск');
 
         $.ajax({
             url: u,
             type: 'GET',
             success: function() {
-                console.log('SS: Request success');
                 if (activity.component === 'torrents') {
                     Lampa.Activity.replace({
                         component: 'torrents',
@@ -105,10 +109,13 @@
                         page: 1
                     });
                 }
+                // Кнопка удалится вместе с активностью при перезагрузке, так что снимать классы не обязательно,
+                // но для порядка можно (если перезагрузка не мгновенная)
+                btn.removeClass('loading disabled');
             },
-            error: function(jqXHR, textStatus, errorThrown) {
-                console.log('SS: Request error', textStatus, errorThrown);
+            error: function() {
                 Lampa.Noty.show('Ошибка запроса Force Search');
+                btn.removeClass('loading disabled');
             }
         });
     }
