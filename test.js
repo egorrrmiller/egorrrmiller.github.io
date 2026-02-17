@@ -56,24 +56,30 @@
         var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
         console.log('SS: Base URL:', u);
 
+        var cats;
         if (movie) {
-            u += '&title=' + encodeURIComponent(movie.title);
-            u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
-            
-            var is_serial = (movie.original_name || movie.number_of_seasons > 0) ? '2' : '1';
-            u += '&is_serial=' + is_serial;
+            try {
+                u += '&title=' + encodeURIComponent(movie.title);
+                u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
+                
+                var is_serial = (movie.original_name || movie.number_of_seasons > 0) ? '2' : '1';
+                u += '&is_serial=' + is_serial;
 
-            if (movie.genres) {
-                var genres = movie.genres.map(function(a) { return a.name; }).join(',');
-                u += '&genres=' + encodeURIComponent(genres);
+                if (movie.genres) {
+                    var genres = movie.genres.map(function(a) { return a.name; }).join(',');
+                    u += '&genres=' + encodeURIComponent(genres);
+                }
+
+                var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
+                console.log('SS: Category:', cat);
+                cats = '&Category[]=' + cat;
+            } catch (e) {
+                console.error('SS: Error building URL params', e);
             }
-
-            var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
-            console.log('SS: Category:', cat);
-            u += '&Category[]=' + cat;
         }
 
         u += '&force_search=true';
+        u += cats;
 
         console.log('SS: Final URL:', u);
         Lampa.Noty.show('Начат принудительный поиск');
