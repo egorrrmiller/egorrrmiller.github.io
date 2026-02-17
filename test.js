@@ -37,6 +37,7 @@
     });
 
     function forceSearch() {
+        console.log('SS: Force Search started');
         var activity = Lampa.Activity.active();
         var movie = activity.movie;
         var query = activity.search;
@@ -52,13 +53,10 @@
 
         url = Lampa.Utils.checkEmptyUrl(url);
 
-        // Базовый URL
         var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
+        console.log('SS: Base URL:', u);
 
         if (movie) {
-            // Используем прямую конкатенацию для надежности, или addUrlComponent если он работает
-            // Но лучше повторить логику parser.js один в один
-            
             u += '&title=' + encodeURIComponent(movie.title);
             u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
             
@@ -71,18 +69,20 @@
             }
 
             var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
+            console.log('SS: Category:', cat);
             u += '&Category[]=' + cat;
         }
 
         u += '&force_search=true';
 
-        console.log('Force Search URL:', u);
+        console.log('SS: Final URL:', u);
         Lampa.Noty.show('Начат принудительный поиск');
 
         $.ajax({
             url: u,
             type: 'GET',
             success: function() {
+                console.log('SS: Request success');
                 if (activity.component === 'torrents') {
                     Lampa.Activity.replace({
                         component: 'torrents',
@@ -92,7 +92,8 @@
                     });
                 }
             },
-            error: function() {
+            error: function(jqXHR, textStatus, errorThrown) {
+                console.log('SS: Request error', textStatus, errorThrown);
                 Lampa.Noty.show('Ошибка запроса Force Search');
             }
         });
