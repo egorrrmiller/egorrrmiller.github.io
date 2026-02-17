@@ -3,14 +3,12 @@
 
     // Перехват запросов
     Lampa.Listener.follow('request_before', function (e) {
-        // Проверяем, что это запрос к Jackett
         if (e.params.url && e.params.url.indexOf('/api/v2.0/indexers/') !== -1 && e.params.url.indexOf('/results') !== -1) {
-            // Убираем year
             e.params.url = e.params.url.replace(/([?&])year=[^&]*&?/, '$1').replace(/&$/, '');
         }
     });
 
-    // Добавляем кнопку перезагрузки (Force Search)
+    // Добавляем кнопку перезагрузки
     Lampa.Listener.follow('activity', function (e) {
         if (e.type === 'start' && e.component === 'torrents') {
             var waitFilter = setInterval(function(){
@@ -28,7 +26,7 @@
                         </div>
                     `);
 
-                    filter.find('.filter--sort').before(btn);
+                    filter.find('.filter--sort').after(btn);
 
                     btn.on('hover:enter', function () {
                         forceSearch();
@@ -54,25 +52,29 @@
 
         url = Lampa.Utils.checkEmptyUrl(url);
 
+        // Базовый URL
         var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
 
         if (movie) {
-            u = Lampa.Utils.addUrlComponent(u, 'title=' + encodeURIComponent(movie.title));
-            u = Lampa.Utils.addUrlComponent(u, 'title_original=' + encodeURIComponent(movie.original_title || movie.original_name));
+            // Используем прямую конкатенацию для надежности, или addUrlComponent если он работает
+            // Но лучше повторить логику parser.js один в один
             
-            var is_serial = movie.original_name ? '2' : '1';
-            u = Lampa.Utils.addUrlComponent(u, 'is_serial=' + is_serial);
+            u += '&title=' + encodeURIComponent(movie.title);
+            u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
+            
+            var is_serial = (movie.original_name || movie.number_of_seasons > 0) ? '2' : '1';
+            u += '&is_serial=' + is_serial;
 
             if (movie.genres) {
                 var genres = movie.genres.map(function(a) { return a.name; }).join(',');
-                u = Lampa.Utils.addUrlComponent(u, 'genres=' + encodeURIComponent(genres));
+                u += '&genres=' + encodeURIComponent(genres);
             }
 
             var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
-            u = Lampa.Utils.addUrlComponent(u, 'Category[]=' + cat);
+            u += '&Category[]=' + cat;
         }
 
-        u = Lampa.Utils.addUrlComponent(u, 'force_search=true');
+        u += '&force_search=true';
 
         console.log('Force Search URL:', u);
         Lampa.Noty.show('Начат принудительный поиск');
@@ -81,7 +83,6 @@
             url: u,
             type: 'GET',
             success: function() {
-                // Перезагружаем активность для обновления списка
                 if (activity.component === 'torrents') {
                     Lampa.Activity.replace({
                         component: 'torrents',
