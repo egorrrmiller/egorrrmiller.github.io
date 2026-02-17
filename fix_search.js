@@ -1,6 +1,14 @@
 (function () {
     'use strict';
 
+    var style = document.createElement('style');
+    style.innerHTML = `
+        @keyframes spin-force { 100% { transform: rotate(360deg); } }
+        .filter--reload.loading svg { animation: spin-force 1s linear infinite; }
+        .filter--reload.disabled { opacity: 0.5; pointer-events: none; }
+    `;
+    document.head.appendChild(style);
+
     Lampa.Listener.follow('request_before', function (e) {
         if (e.params.url && e.params.url.indexOf('/api/v2.0/indexers/') !== -1 && e.params.url.indexOf('/results') !== -1) {
             e.params.url = e.params.url.replace(/([?&])year=[^&]*&?/, '$1').replace(/&$/, '');
@@ -27,14 +35,17 @@
                     filter.find('.filter--sort').after(btn);
 
                     btn.on('hover:enter', function () {
-                        forceSearch();
+                        forceSearch(btn);
                     });
                 }
             }, 200);
         }
     });
 
-    function forceSearch() {
+    function forceSearch(btn) {
+        if (btn.hasClass('disabled')) return;
+        btn.addClass('loading disabled');
+
         var activity = Lampa.Activity.active();
         var movie = activity.movie;
         var query = activity.search;
@@ -54,6 +65,7 @@
 
         if (!url || !key) {
             Lampa.Noty.show('Jackett не настроен');
+            btn.removeClass('loading disabled');
             return;
         }
 
@@ -95,9 +107,12 @@
                         page: 1
                     });
                 }
+                
+                btn.removeClass('loading disabled');
             },
             error: function() {
                 Lampa.Noty.show('Ошибка запроса Force Search');
+                btn.removeClass('loading disabled');
             }
         });
     }
