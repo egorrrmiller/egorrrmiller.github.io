@@ -93,7 +93,6 @@
         }
     }
 
-    // Проверка статуса (POST запрос на /check-subscribe)
     function checkStatus(card, btn) {
         var url = getBaseUrl();
         var uid = getUserId();
@@ -117,7 +116,6 @@
                 updateButtonState(btn, false);
             })
             .finally(function() {
-                // Гарантированно убираем состояние загрузки
                 btn.removeClass('loading disabled');
             });
     }
@@ -155,17 +153,18 @@
                     updateButtonState(btn, !isSubscribed);
                     Lampa.Noty.show(isSubscribed ? 'Отписка успешна' : 'Добавлено в отслеживание');
                 } else {
+                    // Если ошибка, возвращаем исходное состояние
                     updateButtonState(btn, isSubscribed);
                     Lampa.Noty.show('Ошибка запроса: ' + response.status);
                 }
             })
             .catch(function(err) {
                 console.error('JackettSubscribe: Request failed', err);
+                // Если ошибка, возвращаем исходное состояние
                 updateButtonState(btn, isSubscribed);
                 Lampa.Noty.show('Ошибка соединения');
             })
             .finally(function() {
-                // Гарантированно убираем состояние загрузки
                 btn.removeClass('loading disabled');
             });
     }
