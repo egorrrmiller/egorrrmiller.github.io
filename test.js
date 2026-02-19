@@ -8,36 +8,40 @@
         if (window.Lampa && Lampa.Listener) {
             Lampa.Listener.follow('full', function (e) {
                 if (e.type == 'complite') {
-                    var buttons = e.body.find('.full-start-new__buttons');
-                    
-                    if (buttons.length) {
-                        if (buttons.find('.button--jackett-monitor').length) return;
+                    var waitButtons = setInterval(function(){
+                        var buttons = $('.full-start-new__buttons');
+                        
+                        if (buttons.length) {
+                            clearInterval(waitButtons);
+                            
+                            if (buttons.find('.button--jackett-monitor').length) return;
 
-                        var btn = $(
-                            '<div class="full-start__button selector button--jackett-monitor">' +
-                                ICON +
-                                '<span>Отслеживать</span>' +
-                            '</div>'
-                        );
+                            var btn = $(
+                                '<div class="full-start__button selector button--jackett-monitor">' +
+                                    ICON +
+                                    '<span>Отслеживать</span>' +
+                                '</div>'
+                            );
 
-                        // Проверяем статус при загрузке
-                        if (e.data && e.data.movie) {
-                            checkStatus(e.data.movie, btn);
-                        }
-
-                        btn.on('hover:enter', function () {
+                            // Проверяем статус при загрузке
                             if (e.data && e.data.movie) {
-                                toggleSubscription(e.data.movie, btn);
+                                checkStatus(e.data.movie, btn);
                             }
-                        });
 
-                        var optionsBtn = buttons.find('.button--options');
-                        if (optionsBtn.length) {
-                            optionsBtn.before(btn);
-                        } else {
-                            buttons.append(btn);
+                            btn.on('hover:enter', function () {
+                                if (e.data && e.data.movie) {
+                                    toggleSubscription(e.data.movie, btn);
+                                }
+                            });
+
+                            var optionsBtn = buttons.find('.button--options');
+                            if (optionsBtn.length) {
+                                optionsBtn.before(btn);
+                            } else {
+                                buttons.append(btn);
+                            }
                         }
-                    }
+                    }, 200);
                 }
             });
         }
@@ -68,7 +72,6 @@
         var url = getBaseUrl();
         var uid = getUserId();
         
-        // Если нет URL или пользователя, статус проверить нельзя (или считаем что не подписан)
         if (!url || !card.id || !uid) return;
 
         var requestUrl = url + '/subscribe?tmdb=' + card.id + '&uid=' + uid;
@@ -104,8 +107,6 @@
         var uid = getUserId();
         if (!uid) {
             Lampa.Noty.show('Требуется авторизация в CUB');
-            // Можно открыть окно входа, если нужно:
-            // Lampa.Account.showNoAccount();
             return;
         }
         
