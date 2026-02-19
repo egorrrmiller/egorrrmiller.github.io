@@ -1,8 +1,11 @@
 (function () {
     'use strict';
 
-    // Иконка "Прицел"
-    var ICON = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.47 2 2 6.47 2 12C2 17.53 6.47 22 12 22C17.53 22 22 17.53 22 12C22 6.47 17.53 2 12 2ZM12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20Z" fill="currentColor"/><path d="M12 7C9.24 7 7 9.24 7 12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12C17 9.24 14.76 7 12 7ZM12 15C10.34 15 9 13.66 9 12C9 10.34 10.34 9 12 9C13.66 9 15 10.34 15 12C15 13.66 13.66 15 12 15Z" fill="currentColor"/></svg>';
+    // Иконка "Прицел" (Target) - состояние "Не отслеживается"
+    var ICON_DEFAULT = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.47 2 2 6.47 2 12C2 17.53 6.47 22 12 22C17.53 22 22 17.53 22 12C22 6.47 17.53 2 12 2ZM12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20Z" fill="currentColor"/><path d="M12 7C9.24 7 7 9.24 7 12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12C17 9.24 14.76 7 12 7ZM12 15C10.34 15 9 13.66 9 12C9 10.34 10.34 9 12 9C13.66 9 15 10.34 15 12C15 13.66 13.66 15 12 15Z" fill="currentColor"/></svg>';
+
+    // Иконка "Галочка в круге" (Checked) - состояние "Отслеживается"
+    var ICON_ACTIVE = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.47 2 2 6.47 2 12C2 17.53 6.47 22 12 22C17.53 22 22 17.53 22 12C22 6.47 17.53 2 12 2ZM12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20Z" fill="currentColor"/><path d="M10.5 16.2L7.2 12.9L8.6 11.5L10.5 13.4L15.4 8.5L16.8 9.9L10.5 16.2Z" fill="currentColor"/></svg>';
 
     function init() {
         if (window.Lampa && Lampa.Listener) {
@@ -18,7 +21,7 @@
 
                             var btn = $(
                                 '<div class="full-start__button selector button--jackett-monitor">' +
-                                    ICON +
+                                    ICON_DEFAULT +
                                     '<span>Отслеживать</span>' +
                                 '</div>'
                             );
@@ -67,16 +70,30 @@
         return null;
     }
 
-    // Проверка статуса (GET запрос)
+    function updateButtonState(btn, active) {
+        if (active) {
+            btn.addClass('active');
+            btn.find('span').text('Отслеживается');
+            btn.find('svg').replaceWith(ICON_ACTIVE);
+        } else {
+            btn.removeClass('active');
+            btn.find('span').text('Отслеживать');
+            btn.find('svg').replaceWith(ICON_DEFAULT);
+        }
+    }
+
+    // Проверка статуса (POST запрос на /check-subscribe)
     function checkStatus(card, btn) {
         var url = getBaseUrl();
         var uid = getUserId();
         
         if (!url || !card.id || !uid) return;
 
-        var requestUrl = url + '/subscribe?tmdb=' + card.id + '&uid=' + uid;
+        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&uid=' + uid;
 
-        fetch(requestUrl, { method: 'GET' })
+        fetch(requestUrl, { 
+            method: 'POST' 
+        })
             .then(function(response) {
                 if (response.ok) {
                     return response.json().catch(function(){ return {}; });
@@ -84,19 +101,18 @@
                 throw new Error('Network response was not ok');
             })
             .then(function(data) {
-                var isActive = data.active === true || data === true; 
-                
-                if (isActive) {
-                    btn.addClass('active');
-                    btn.find('span').text('Отслеживается');
+                if (data.result === true) {
+                    updateButtonState(btn, true);
+                } else {
+                    updateButtonState(btn, false);
                 }
             })
             .catch(function() {
-                // Ошибка или 404 - не подписан
+                // Ошибка - считаем что не подписан
+                updateButtonState(btn, false);
             });
     }
 
-    // Переключение подписки (POST/DELETE)
     function toggleSubscription(card, btn) {
         var url = getBaseUrl();
         if (!url) {
@@ -116,23 +132,23 @@
         }
 
         var isSubscribed = btn.hasClass('active');
-        var method = isSubscribed ? 'DELETE' : 'POST';
-        var requestUrl = url + '/subscribe?tmdb=' + card.id + '&uid=' + uid;
+        
+        // Если уже подписан - отписываемся (/unsubscribe), иначе подписываемся (/subscribe)
+        var endpoint = isSubscribed ? '/unsubscribe' : '/subscribe';
+        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&uid=' + uid;
 
         var options = {
-            method: method,
+            method: 'POST',
             headers: {}
         };
 
         fetch(requestUrl, options).then(function(response) {
             if (response.ok) {
                 if (isSubscribed) {
-                    btn.removeClass('active');
-                    btn.find('span').text('Отслеживать');
+                    updateButtonState(btn, false);
                     Lampa.Noty.show('Отписка успешна');
                 } else {
-                    btn.addClass('active');
-                    btn.find('span').text('Отслеживается');
+                    updateButtonState(btn, true);
                     Lampa.Noty.show('Добавлено в отслеживание');
                 }
             } else {
