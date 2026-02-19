@@ -1,123 +1,152 @@
 (function () {
     'use strict';
 
-    // Добавляем стили для анимации
-    var style = document.createElement('style');
-    style.innerHTML = `
-        @keyframes spin-force { 100% { transform: rotate(360deg); } }
-        .filter--reload.loading svg { animation: spin-force 1s linear infinite; }
-        .filter--reload.disabled { opacity: 0.5; pointer-events: none; }
-    `;
-    document.head.appendChild(style);
+    // Иконка "Прицел"
+    var ICON = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C6.47 2 2 6.47 2 12C2 17.53 6.47 22 12 22C17.53 22 22 17.53 22 12C22 6.47 17.53 2 12 2ZM12 20C7.58 20 4 16.42 4 12C4 7.58 7.58 4 12 4C16.42 4 20 7.58 20 12C20 16.42 16.42 20 12 20Z" fill="currentColor"/><path d="M12 7C9.24 7 7 9.24 7 12C7 14.76 9.24 17 12 17C14.76 17 17 14.76 17 12C17 9.24 14.76 7 12 7ZM12 15C10.34 15 9 13.66 9 12C9 10.34 10.34 9 12 9C13.66 9 15 10.34 15 12C15 13.66 13.66 15 12 15Z" fill="currentColor"/></svg>';
 
-    Lampa.Listener.follow('request_before', function (e) {
-        if (e.params.url && e.params.url.indexOf('/api/v2.0/indexers/') !== -1 && e.params.url.indexOf('/results') !== -1) {
-            e.params.url = e.params.url.replace(/([?&])year=[^&]*&?/, '$1').replace(/&$/, '');
-        }
-    });
-
-    Lampa.Listener.follow('activity', function (e) {
-        if (e.type === 'start' && e.component === 'torrents') {
-            var waitFilter = setInterval(function(){
-                var filter = $('.torrent-filter');
-                if (filter.length) {
-                    clearInterval(waitFilter);
+    function init() {
+        if (window.Lampa && Lampa.Listener) {
+            Lampa.Listener.follow('full', function (e) {
+                if (e.type == 'complite') {
+                    var buttons = e.body.find('.full-start-new__buttons');
                     
-                    if (filter.find('.filter--reload').length) return;
+                    if (buttons.length) {
+                        if (buttons.find('.button--jackett-monitor').length) return;
 
-                    var btn = $(`
-                        <div class="simple-button simple-button--filter selector filter--reload">
-                            <svg fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" style="width: 1.5em; height: 1.5em;">
-                                <path d="M4,12a1,1,0,0,1-2,0A9.983,9.983,0,0,1,18.242,4.206V2.758a1,1,0,1,1,2,0v4a1,1,0,0,1-1,1h-4a1,1,0,0,1,0-2h1.743A7.986,7.986,0,0,0,4,12Zm17-1a1,1,0,0,0-1,1A7.986,7.986,0,0,1,7.015,18.242H8.757a1,1,0,1,0,0-2h-4a1,1,0,0,0-1,1v4a1,1,0,0,0,2,0V19.794A9.984,9.984,0,0,0,22,12,1,1,0,0,0,21,11Z" fill="currentColor"></path>
-                            </svg>
-                        </div>
-                    `);
+                        var btn = $(
+                            '<div class="full-start__button selector button--jackett-monitor">' +
+                                ICON +
+                                '<span>Отслеживать</span>' +
+                            '</div>'
+                        );
 
-                    filter.find('.filter--sort').after(btn);
+                        // Проверяем статус при загрузке
+                        if (e.data && e.data.movie) {
+                            checkStatus(e.data.movie, btn);
+                        }
 
-                    btn.on('hover:enter', function () {
-                        forceSearch(btn);
-                    });
+                        btn.on('hover:enter', function () {
+                            if (e.data && e.data.movie) {
+                                toggleSubscription(e.data.movie, btn);
+                            }
+                        });
+
+                        var optionsBtn = buttons.find('.button--options');
+                        if (optionsBtn.length) {
+                            optionsBtn.before(btn);
+                        } else {
+                            buttons.append(btn);
+                        }
+                    }
                 }
-            }, 200);
+            });
         }
-    });
+    }
 
-    function forceSearch(btn) {
-        // Блокируем кнопку и запускаем анимацию
-        if (btn.hasClass('disabled')) return;
-        btn.addClass('loading disabled');
-
-        var activity = Lampa.Activity.active();
-        var movie = activity.movie;
-        var query = activity.search;
-
+    function getBaseUrl() {
         var useLink = Lampa.Storage.field('parser_use_link');
-        var url, key;
+        var url;
 
         if (useLink == 'two') {
             url = Lampa.Storage.field('jackett_url_two');
-            key = Lampa.Storage.field('jackett_key_two');
         } else {
             url = Lampa.Storage.field('jackett_url');
-            key = Lampa.Storage.field('jackett_key');
         }
+        
+        return url ? url.replace(/\/$/, '') : null;
+    }
 
-        var interview = Lampa.Storage.field('jackett_interview') == 'healthy' ? 'status:healthy' : 'all';
+    function getUserId() {
+        if (Lampa.Account.Permit && Lampa.Account.Permit.access && Lampa.Account.Permit.user) {
+            return Lampa.Account.Permit.user.id;
+        }
+        return null;
+    }
 
-        if (!url || !key) {
-            Lampa.Noty.show('Jackett не настроен');
-            btn.removeClass('loading disabled');
+    // Проверка статуса (GET запрос)
+    function checkStatus(card, btn) {
+        var url = getBaseUrl();
+        var uid = getUserId();
+        
+        // Если нет URL или пользователя, статус проверить нельзя (или считаем что не подписан)
+        if (!url || !card.id || !uid) return;
+
+        var requestUrl = url + '/subscribe?tmdb=' + card.id + '&uid=' + uid;
+
+        fetch(requestUrl, { method: 'GET' })
+            .then(function(response) {
+                if (response.ok) {
+                    return response.json().catch(function(){ return {}; });
+                }
+                throw new Error('Network response was not ok');
+            })
+            .then(function(data) {
+                var isActive = data.active === true || data === true; 
+                
+                if (isActive) {
+                    btn.addClass('active');
+                    btn.find('span').text('Отслеживается');
+                }
+            })
+            .catch(function() {
+                // Ошибка или 404 - не подписан
+            });
+    }
+
+    // Переключение подписки (POST/DELETE)
+    function toggleSubscription(card, btn) {
+        var url = getBaseUrl();
+        if (!url) {
+            Lampa.Noty.show('Не настроен URL Jackett');
+            return;
+        }
+        
+        var uid = getUserId();
+        if (!uid) {
+            Lampa.Noty.show('Требуется авторизация в CUB');
+            // Можно открыть окно входа, если нужно:
+            // Lampa.Account.showNoAccount();
+            return;
+        }
+        
+        if (!card.id) {
+            Lampa.Noty.show('Ошибка: отсутствует ID');
             return;
         }
 
-        url = Lampa.Utils.checkEmptyUrl(url);
+        var isSubscribed = btn.hasClass('active');
+        var method = isSubscribed ? 'DELETE' : 'POST';
+        var requestUrl = url + '/subscribe?tmdb=' + card.id + '&uid=' + uid;
 
-        var u = url + '/api/v2.0/indexers/' + interview + '/results?apikey=' + key + '&Query=' + encodeURIComponent(query);
+        var options = {
+            method: method,
+            headers: {}
+        };
 
-        if (movie) {
-            try {
-                u += '&title=' + encodeURIComponent(movie.title);
-                u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
-                
-                var is_serial = (movie.original_name || movie.number_of_seasons > 0) ? '2' : '1';
-                u += '&is_serial=' + is_serial;
-
-                if (movie.genres) {
-                    var genres = movie.genres.map(function(a) { return a.name; }).join(',');
-                    u += '&genres=' + encodeURIComponent(genres);
+        fetch(requestUrl, options).then(function(response) {
+            if (response.ok) {
+                if (isSubscribed) {
+                    btn.removeClass('active');
+                    btn.find('span').text('Отслеживать');
+                    Lampa.Noty.show('Отписка успешна');
+                } else {
+                    btn.addClass('active');
+                    btn.find('span').text('Отслеживается');
+                    Lampa.Noty.show('Добавлено в отслеживание');
                 }
-
-                var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
-                u += '&Category[]=' + cat;
-            } catch (e) {}
-        }
-
-        u += '&force_search=true';
-
-        Lampa.Noty.show('Начат принудительный поиск');
-
-        $.ajax({
-            url: u,
-            type: 'GET',
-            success: function() {
-                if (activity.component === 'torrents') {
-                    Lampa.Activity.replace({
-                        component: 'torrents',
-                        movie: movie,
-                        search: query,
-                        page: 1
-                    });
-                }
-                // Кнопка удалится вместе с активностью при перезагрузке, так что снимать классы не обязательно,
-                // но для порядка можно (если перезагрузка не мгновенная)
-                btn.removeClass('loading disabled');
-            },
-            error: function() {
-                Lampa.Noty.show('Ошибка запроса Force Search');
-                btn.removeClass('loading disabled');
+            } else {
+                Lampa.Noty.show('Ошибка запроса: ' + response.status);
             }
+        }).catch(function(err) {
+            console.error('JackettSubscribe: Request failed', err);
+            Lampa.Noty.show('Ошибка соединения');
         });
     }
 
+    if (window.appready) init();
+    else {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type == 'ready') init();
+        });
+    }
 })();
