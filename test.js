@@ -175,7 +175,7 @@
         var items = [];
         var activeItem = null;
 
-        $('body').append('<style>.jackett-tracked-item { display: flex; flex-direction: row; padding: 10px; margin: 5px 20px; background: rgba(0,0,0,0.2); border-radius: 10px; align-items: center; transition: background 0.3s; }.jackett-tracked-item.focus, .jackett-tracked-item:hover { background: rgba(255,255,255,0.1); }.jackett-tracked-item__img { width: 80px; height: 120px; border-radius: 5px; object-fit: cover; margin-right: 15px; }.jackett-tracked-item__info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }.jackett-tracked-item__title { font-size: 1.2em; font-weight: bold; margin-bottom: 5px; color: #fff; }.jackett-tracked-item__time { font-size: 0.9em; color: #aaa; }.jackett-tracked-item__actions { display: flex; flex-direction: row; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }.jackett-tracked-item.focus .jackett-tracked-item__actions, .jackett-tracked-item:hover .jackett-tracked-item__actions, .jackett-tracked-item:focus-within .jackett-tracked-item__actions { opacity: 1; }.jackett-tracked-btn { padding: 10px 15px; margin-left: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); color: #fff; text-align: center; transition: background 0.3s, transform 0.2s; cursor: pointer; }.jackett-tracked-btn.focus, .jackett-tracked-btn:hover { background: #fff; color: #000; transform: scale(1.05); }</style>');
+        $('body').append('<style>.jackett-tracked-item { display: flex; flex-direction: row; padding: 10px; margin: 5px 20px; background: rgba(0,0,0,0.2); border-radius: 10px; align-items: center; transition: background 0.3s; }.jackett-tracked-item.focus, .jackett-tracked-item:hover { background: rgba(255,255,255,0.1); }.jackett-tracked-item__img { width: 80px; height: 120px; border-radius: 5px; object-fit: cover; margin-right: 15px; }.jackett-tracked-item__info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }.jackett-tracked-item__title { font-size: 1.2em; font-weight: bold; margin-bottom: 5px; color: #fff; }.jackett-tracked-item__time { font-size: 0.9em; color: #aaa; }.jackett-tracked-item__progress-text { font-size: 0.95em; color: #eee; margin-top: 5px; font-weight: bold; }.jackett-tracked-item__progress-bar { margin-top: 5px; width: 100%; position: relative; }.jackett-tracked-item__actions { display: flex; flex-direction: row; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }.jackett-tracked-item.focus .jackett-tracked-item__actions, .jackett-tracked-item:hover .jackett-tracked-item__actions, .jackett-tracked-item:focus-within .jackett-tracked-item__actions { opacity: 1; }.jackett-tracked-btn { padding: 10px 15px; margin-left: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); color: #fff; text-align: center; transition: background 0.3s, transform 0.2s; cursor: pointer; }.jackett-tracked-btn.focus, .jackett-tracked-btn:hover { background: #fff; color: #000; transform: scale(1.05); }</style>');
 
         comp.create = function () {
             var _this = this;
@@ -279,11 +279,41 @@
                 var timeStr = itemData.last_refresh_time ? 'Обновлено: ' + itemData.last_refresh_time : '';
                 var poster = itemData.poster_path ? Lampa.Api.sources.tmdb.img(itemData.poster_path) : './img/img_broken.svg';
 
+                var watchedText = '';
+                var timelineObj = null;
+
+                if (itemData.original_name || itemData.name) {
+                    var last = Lampa.Storage.get('online_watched_last', '{}');
+                    var filed = last[Lampa.Utils.hash(itemData.original_title || itemData.original_name || itemData.name)];
+
+                    if (filed && filed.episode) {
+                        watchedText = (Lampa.Lang.translate('full_episode') || 'Серия') + ' ' + filed.episode;
+                        var seasonStr = filed.season > 10 ? ':' : '';
+                        var hash = Lampa.Utils.hash([filed.season, seasonStr, filed.episode, itemData.original_title || itemData.original_name || itemData.name].join(''));
+                        timelineObj = Lampa.Timeline.view(hash);
+                    } else {
+                        var any = Lampa.Timeline.watched(itemData, true);
+                        if (Array.isArray(any)) any = any.pop();
+                        if (any) {
+                            watchedText = (Lampa.Lang.translate('full_episode') || 'Серия') + ' ' + any.ep;
+                            timelineObj = any.view;
+                        }
+                    }
+                } else {
+                    var time = Lampa.Timeline.watched(itemData, true);
+                    if (time && time.percent) {
+                        watchedText = (Lampa.Lang.translate('title_viewed') || 'Просмотрено') + ' ' + (time.time ? Lampa.Utils.secondsToTimeHuman(time.time) : time.percent + '%');
+                        timelineObj = time;
+                    }
+                }
+
                 var itemHtml = '<div class="jackett-tracked-item selector layer--visible layer--render">' +
                     '<img src="' + poster + '" class="jackett-tracked-item__img" />' +
                     '<div class="jackett-tracked-item__info">' +
                     '<div class="jackett-tracked-item__title">' + title + '</div>' +
                     '<div class="jackett-tracked-item__time">' + timeStr + '</div>' +
+                    '<div class="jackett-tracked-item__progress-text"></div>' +
+                    '<div class="jackett-tracked-item__progress-bar"></div>' +
                     '</div>' +
                     '<div class="jackett-tracked-item__actions">' +
                     '<div class="jackett-tracked-btn btn-open selector">Открыть</div>' +
@@ -292,6 +322,15 @@
                     '</div>';
 
                 var itemObj = $(itemHtml);
+
+                if (watchedText) {
+                    itemObj.find('.jackett-tracked-item__progress-text').text(watchedText);
+                    if (timelineObj && timelineObj.percent) {
+                        var tl = Lampa.Timeline.render(timelineObj);
+                        tl.css('position', 'relative').css('margin-top', '5px');
+                        itemObj.find('.jackett-tracked-item__progress-bar').append(tl);
+                    }
+                }
 
                 itemObj.on('hover:focus', function () {
                     activeItem = itemObj;
