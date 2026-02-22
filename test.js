@@ -36,12 +36,12 @@
                         );
 
                         if (e.data && e.data.movie) {
-                            checkStatus(e.data.movie, btn, e.data.method);
+                            checkStatus(e.data.movie, btn);
                         }
 
                         btn.on('hover:enter', function () {
                             if (e.data && e.data.movie) {
-                                toggleSubscription(e.data.movie, btn, e.data.method);
+                                toggleSubscription(e.data.movie, btn);
                             }
                         });
 
@@ -89,14 +89,13 @@
         }
     }
 
-    function checkStatus(card, btn, method) {
+    function checkStatus(card, btn) {
         var url = getBaseUrl();
         var uid = getUserId();
 
         if (!url || !card.id || !uid) return;
 
-        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
-        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
+        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -117,7 +116,7 @@
             });
     }
 
-    function toggleSubscription(card, btn, method) {
+    function toggleSubscription(card, btn) {
         if (btn.hasClass('disabled')) return;
 
         var url = getBaseUrl();
@@ -138,9 +137,8 @@
         }
 
         var isSubscribed = btn.hasClass('active');
-        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
         var endpoint = isSubscribed ? '/unsubscribe' : '/subscribe';
-        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
+        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -201,19 +199,34 @@
                         return;
                     }
 
+                    // For each item, try to fetch info from TMDB api
                     var promises = trackedItems.map(function (item) {
                         return new Promise(function (resolve) {
                             if (!item.tmdb_id) return resolve(null);
 
-                            var mediaType = item.media || item.type || 'movie';
-
-                            Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: mediaType }, function (data) {
-                                if (data && data.movie) {
-                                    data.movie.media_type_passed = mediaType;
-                                    resolve(data.movie);
-                                } else resolve(null);
+                            // We don't know if it's movie or TV, try TV first as subscriptions are mostly for series
+                            Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'tv' }, function (tvData) {
+                                if (tvData && tvData.movie) {
+                                    resolve(tvData.movie);
+                                } else {
+                                    // Fallback to movie if tv fails
+                                    Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
+                                        if (movieData && movieData.movie) {
+                                            resolve(movieData.movie);
+                                        } else {
+                                            resolve(null);
+                                        }
+                                    }, function () {
+                                        resolve(null);
+                                    });
+                                }
                             }, function () {
-                                resolve(null);
+                                Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
+                                    if (movieData && movieData.movie) resolve(movieData.movie);
+                                    else resolve(null);
+                                }, function () {
+                                    resolve(null);
+                                });
                             });
                         });
                     });
@@ -226,51 +239,6 @@
                             return;
                         }
 
-                        // Attach onMenuShow and format titles directly to the items so Native Card picks it up
-                        validItems.forEach(function (cardItem) {
-                            cardItem.source = 'tmdb';
-
-                            var itemDataSource = trackedItems.find(function (t) { return t.tmdb_id == cardItem.id; });
-                            if (itemDataSource && itemDataSource.last_refresh_time && itemDataSource.last_refresh_time !== 'Никогда') {
-                                var formatTime = function (dateStr) {
-                                    var d = new Date(dateStr);
-                                    if (isNaN(d.getTime())) return dateStr;
-                                    var day = ('0' + d.getDate()).slice(-2);
-                                    var month = ('0' + (d.getMonth() + 1)).slice(-2);
-                                    var year = d.getFullYear();
-                                    var hours = ('0' + d.getHours()).slice(-2);
-                                    var minutes = ('0' + d.getMinutes()).slice(-2);
-                                    return day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
-                                };
-
-                                var dateStr = '<div style="font-size: 0.7em; color: #888; margin-top: 3px;">Обновлено: ' + formatTime(itemDataSource.last_refresh_time) + '</div>';
-                                if (cardItem.name) cardItem.name += dateStr;
-                                else if (cardItem.title) cardItem.title += dateStr;
-                            }
-
-                            cardItem.onMenuShow = function (menu_main, cardHtml, data) {
-                                menu_main.push({
-                                    title: 'Отменить отслеживание',
-                                    separator: true,
-                                    onSelect: function () {
-                                        var mType = data.media_type_passed || (data.name ? 'tv' : 'movie');
-                                        var unsubscribeUrl = url + '/unsubscribe?tmdb=' + data.id + '&media=' + mType + '&uid=' + uid;
-                                        Lampa.Noty.show('Удаляем...');
-                                        fetch(unsubscribeUrl, { method: 'POST' }).then(function (res) {
-                                            if (res.ok) {
-                                                if (cardHtml.remove) cardHtml.remove();
-                                                else $(cardHtml).remove();
-                                                Lampa.Noty.show('Удалено из отслеживаемых');
-                                                Lampa.Controller.toggle('content');
-                                            } else {
-                                                Lampa.Noty.show('Ошибка удаления');
-                                            }
-                                        });
-                                    }
-                                });
-                            };
-                        });
-
                         _this.build({
                             results: validItems,
                             page: 1,
@@ -282,8 +250,68 @@
                     console.error('JackettTracked:', err);
                     _this.empty('Ошибка загрузки данных: ' + err.message);
                 });
+        };
 
-            return this.render();
+        comp.cardRender = function (object, element, card) {
+            card.onMenu = function () {
+                Lampa.Select.show({
+                    title: 'Действия',
+                    items: [
+                        {
+                            title: 'Перейти к карточке',
+                            open: true
+                        },
+                        {
+                            title: 'Отменить отслеживание',
+                            remove: true
+                        }
+                    ],
+                    onSelect: function (a) {
+                        if (a.open) {
+                            Lampa.Activity.push({
+                                url: element.id,
+                                title: element.title || element.name,
+                                component: 'full',
+                                id: element.id,
+                                method: element.name ? 'tv' : 'movie',
+                                card: element,
+                                source: 'tmdb'
+                            });
+                        } else if (a.remove) {
+                            var url = getBaseUrl();
+                            var uid = getUserId();
+                            if (url && uid) {
+                                Lampa.Noty.show('Удаляем...');
+                                fetch(url + '/unsubscribe?tmdb=' + element.id + '&uid=' + uid, { method: 'POST' })
+                                    .then(function (response) {
+                                        if (response.ok) {
+                                            card.destroy(); // Remove card visually
+                                            Lampa.Noty.show('Удалено из отслеживаемых');
+                                        } else {
+                                            Lampa.Noty.show('Ошибка удаления');
+                                        }
+                                    });
+                            }
+                        }
+                    },
+                    onBack: function () {
+                        Lampa.Controller.toggle('content');
+                    }
+                });
+            };
+
+            card.onEnter = function () {
+                // Open standard full view by default, same as Lampa's history/bookmarks
+                Lampa.Activity.push({
+                    url: element.id,
+                    title: element.title || element.name,
+                    component: 'full',
+                    id: element.id,
+                    method: element.name ? 'tv' : 'movie',
+                    card: element,
+                    source: 'tmdb'
+                });
+            };
         };
 
         return comp;
