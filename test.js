@@ -195,9 +195,7 @@
                     if (response.ok) return response.json();
                     throw new Error('Network response was not ok');
                 })
-                .then(function (trackedItemsData) {
-                    var trackedItems = trackedItemsData.results ? trackedItemsData.results : trackedItemsData;
-
+                .then(function (trackedItems) {
                     if (!trackedItems || !trackedItems.length) {
                         _this.empty('Список отслеживаемых пуст');
                         return;
