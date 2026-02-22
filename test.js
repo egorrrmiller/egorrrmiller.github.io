@@ -36,12 +36,12 @@
                         );
 
                         if (e.data && e.data.movie) {
-                            checkStatus(e.data.movie, btn);
+                            checkStatus(e.data.movie, btn, e.data.method);
                         }
 
                         btn.on('hover:enter', function () {
                             if (e.data && e.data.movie) {
-                                toggleSubscription(e.data.movie, btn);
+                                toggleSubscription(e.data.movie, btn, e.data.method);
                             }
                         });
 
@@ -89,13 +89,14 @@
         }
     }
 
-    function checkStatus(card, btn) {
+    function checkStatus(card, btn, method) {
         var url = getBaseUrl();
         var uid = getUserId();
 
         if (!url || !card.id || !uid) return;
 
-        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&uid=' + uid;
+        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
+        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -116,7 +117,7 @@
             });
     }
 
-    function toggleSubscription(card, btn) {
+    function toggleSubscription(card, btn, method) {
         if (btn.hasClass('disabled')) return;
 
         var url = getBaseUrl();
@@ -137,8 +138,9 @@
         }
 
         var isSubscribed = btn.hasClass('active');
+        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
         var endpoint = isSubscribed ? '/unsubscribe' : '/subscribe';
-        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&uid=' + uid;
+        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -193,7 +195,10 @@
                     if (response.ok) return response.json();
                     throw new Error('Network response was not ok');
                 })
-                .then(function (trackedItems) {
+                .then(function (trackedItemsData) {
+                    // Поддержка как массива, так и объекта с { results: [...] }
+                    var trackedItems = trackedItemsData.results ? trackedItemsData.results : trackedItemsData;
+
                     if (!trackedItems || !trackedItems.length) {
                         _this.empty('Список отслеживаемых пуст');
                         return;
@@ -204,30 +209,47 @@
                         return new Promise(function (resolve) {
                             if (!item.tmdb_id) return resolve(null);
 
-                            // We don't know if it's movie or TV, try TV first as subscriptions are mostly for series
-                            Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'tv' }, function (tvData) {
-                                if (tvData && tvData.movie) {
-                                    resolve(tvData.movie);
-                                } else {
-                                    // Fallback to movie if tv fails
-                                    Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
-                                        if (movieData && movieData.movie) {
-                                            resolve(movieData.movie);
-                                        } else {
-                                            resolve(null);
+                            var mediaType = item.media || item.type;
+
+                            if (mediaType) {
+                                Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: mediaType }, function (data) {
+                                    if (data && data.movie) {
+                                        data.movie.media_type_passed = mediaType;
+                                        if (item.last_refresh_time && item.last_refresh_time !== 'Никогда') {
+                                            data.movie.last_refresh_time = item.last_refresh_time;
                                         }
-                                    }, function () {
-                                        resolve(null);
-                                    });
-                                }
-                            }, function () {
-                                Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
-                                    if (movieData && movieData.movie) resolve(movieData.movie);
-                                    else resolve(null);
+                                        resolve(data.movie);
+                                    } else resolve(null);
                                 }, function () {
                                     resolve(null);
                                 });
-                            });
+                            } else {
+                                // Fallback: We don't know if it's movie or TV, try TV first
+                                Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'tv' }, function (tvData) {
+                                    if (tvData && tvData.movie) {
+                                        tvData.movie.media_type_passed = 'tv';
+                                        resolve(tvData.movie);
+                                    } else {
+                                        // Fallback to movie if tv fails
+                                        Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
+                                            if (movieData && movieData.movie) {
+                                                movieData.movie.media_type_passed = 'movie';
+                                                resolve(movieData.movie);
+                                            } else {
+                                                resolve(null);
+                                            }
+                                        }, function () { resolve(null); });
+                                    }
+                                }, function () {
+                                    // Complete failure of first request, also attempt movie
+                                    Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
+                                        if (movieData && movieData.movie) {
+                                            movieData.movie.media_type_passed = 'movie';
+                                            resolve(movieData.movie);
+                                        } else resolve(null);
+                                    }, function () { resolve(null); });
+                                });
+                            }
                         });
                     });
 
@@ -253,6 +275,25 @@
         };
 
         comp.cardRender = function (object, element, card) {
+            var mediaType = element.media_type_passed || (element.name ? 'tv' : 'movie');
+
+            if (element.last_refresh_time) {
+                var d = new Date(element.last_refresh_time);
+                if (!isNaN(d.getTime())) {
+                    var day = ('0' + d.getDate()).slice(-2);
+                    var month = ('0' + (d.getMonth() + 1)).slice(-2);
+                    var year = d.getFullYear();
+                    var hours = ('0' + d.getHours()).slice(-2);
+                    var minutes = ('0' + d.getMinutes()).slice(-2);
+                    var formattedTime = day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
+
+                    var htmlNode = card.render ? card.render() : null;
+                    if (htmlNode && htmlNode.find) {
+                        htmlNode.find('.card__title').after('<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 3px; font-weight: normal; font-family: sans-serif;">Обновлено:<br>' + formattedTime + '</div>');
+                    }
+                }
+            }
+
             card.onMenu = function () {
                 Lampa.Select.show({
                     title: 'Действия',
@@ -273,7 +314,7 @@
                                 title: element.title || element.name,
                                 component: 'full',
                                 id: element.id,
-                                method: element.name ? 'tv' : 'movie',
+                                method: mediaType,
                                 card: element,
                                 source: 'tmdb'
                             });
@@ -282,7 +323,7 @@
                             var uid = getUserId();
                             if (url && uid) {
                                 Lampa.Noty.show('Удаляем...');
-                                fetch(url + '/unsubscribe?tmdb=' + element.id + '&uid=' + uid, { method: 'POST' })
+                                fetch(url + '/unsubscribe?tmdb=' + element.id + '&media=' + mediaType + '&uid=' + uid, { method: 'POST' })
                                     .then(function (response) {
                                         if (response.ok) {
                                             card.destroy(); // Remove card visually
@@ -301,13 +342,12 @@
             };
 
             card.onEnter = function () {
-                // Open standard full view by default, same as Lampa's history/bookmarks
                 Lampa.Activity.push({
                     url: element.id,
                     title: element.title || element.name,
                     component: 'full',
                     id: element.id,
-                    method: element.name ? 'tv' : 'movie',
+                    method: mediaType,
                     card: element,
                     source: 'tmdb'
                 });
