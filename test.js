@@ -36,12 +36,12 @@
                         );
 
                         if (e.data && e.data.movie) {
-                            checkStatus(e.data.movie, btn);
+                            checkStatus(e.data.movie, btn, e.data.method);
                         }
 
                         btn.on('hover:enter', function () {
                             if (e.data && e.data.movie) {
-                                toggleSubscription(e.data.movie, btn);
+                                toggleSubscription(e.data.movie, btn, e.data.method);
                             }
                         });
 
@@ -89,13 +89,14 @@
         }
     }
 
-    function checkStatus(card, btn) {
+    function checkStatus(card, btn, method) {
         var url = getBaseUrl();
         var uid = getUserId();
 
         if (!url || !card.id || !uid) return;
 
-        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&uid=' + uid;
+        var reqMethod = method || (card.name ? 'tv' : 'movie');
+        var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -116,7 +117,7 @@
             });
     }
 
-    function toggleSubscription(card, btn) {
+    function toggleSubscription(card, btn, method) {
         if (btn.hasClass('disabled')) return;
 
         var url = getBaseUrl();
@@ -137,8 +138,9 @@
         }
 
         var isSubscribed = btn.hasClass('active');
+        var reqMethod = method || (card.name ? 'tv' : 'movie');
         var endpoint = isSubscribed ? '/unsubscribe' : '/subscribe';
-        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&uid=' + uid;
+        var requestUrl = url + endpoint + '?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
         btn.addClass('loading disabled');
         btn.find('svg').replaceWith(ICON_LOADING);
@@ -209,34 +211,26 @@
                         return new Promise(function (resolve) {
                             if (!item.tmdb_id) return resolve(null);
 
-                            var resolveWithTime = function (data) {
-                                if (data) {
-                                    data.last_refresh_time = item.last_refresh_time || 'Никогда';
-                                    resolve(data);
-                                } else resolve(null);
-                            };
+                            var mediaType = item.media || item.type || (item.name ? 'tv' : 'movie'); // Fallback logic
 
-                            Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'tv' }, function (tvData) {
-                                if (tvData && tvData.movie) {
-                                    resolveWithTime(tvData.movie);
+                            Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: mediaType }, function (data) {
+                                if (data && data.movie) {
+                                    data.movie.last_refresh_time = item.last_refresh_time || 'Никогда';
+                                    data.movie.media_type_passed = mediaType;
+                                    resolve(data.movie);
                                 } else {
-                                    Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
-                                        if (movieData && movieData.movie) {
-                                            resolveWithTime(movieData.movie);
-                                        } else {
-                                            resolve(null);
-                                        }
-                                    }, function () {
-                                        resolve(null);
-                                    });
+                                    // Soft fallback if user's backend has not adapted media yet
+                                    var altType = mediaType === 'tv' ? 'movie' : 'tv';
+                                    Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: altType }, function (altData) {
+                                        if (altData && altData.movie) {
+                                            altData.movie.last_refresh_time = item.last_refresh_time || 'Никогда';
+                                            altData.movie.media_type_passed = altType;
+                                            resolve(altData.movie);
+                                        } else resolve(null);
+                                    }, function () { resolve(null); });
                                 }
                             }, function () {
-                                Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
-                                    if (movieData && movieData.movie) resolveWithTime(movieData.movie);
-                                    else resolve(null);
-                                }, function () {
-                                    resolve(null);
-                                });
+                                resolve(null);
                             });
                         });
                     });
@@ -342,24 +336,35 @@
                     }
                 });
 
-                itemObj.find('.btn-open').on('hover:enter', function () {
+                var openCard = function () {
+                    var mType = itemData.media_type_passed || (itemData.name ? 'tv' : 'movie');
                     Lampa.Activity.push({
                         url: itemData.id,
                         title: title,
                         component: 'full',
                         id: itemData.id,
-                        method: itemData.name ? 'tv' : 'movie',
+                        method: mType,
                         card: itemData,
                         source: 'tmdb'
                     });
+                };
+
+                itemObj.find('.btn-open').on('hover:enter', openCard);
+
+                itemObj.on('hover:enter', function (e) {
+                    if (!$(e.target).closest('.jackett-tracked-btn').length) {
+                        openCard();
+                    }
                 });
 
                 itemObj.find('.btn-unfollow').on('hover:enter', function () {
                     var url = getBaseUrl();
                     var uid = getUserId();
+                    var mType = itemData.media_type_passed || (itemData.name ? 'tv' : 'movie');
+
                     if (url && uid) {
                         Lampa.Noty.show('Удаляем...');
-                        fetch(url + '/unsubscribe?tmdb=' + itemData.id + '&uid=' + uid, { method: 'POST' })
+                        fetch(url + '/unsubscribe?tmdb=' + itemData.id + '&media=' + mType + '&uid=' + uid, { method: 'POST' })
                             .then(function (response) {
                                 if (response.ok) {
                                     itemObj.remove();
@@ -371,10 +376,6 @@
                                 } else Lampa.Noty.show('Ошибка удаления');
                             });
                     }
-                });
-
-                itemObj.on('hover:enter', function () {
-                    itemObj.find('.btn-open').trigger('hover:enter');
                 });
 
                 scroll.append(itemObj);
