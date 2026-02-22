@@ -271,7 +271,11 @@
                             };
                         });
 
-                        _this.build(validItems);
+                        _this.build({
+                            results: validItems,
+                            page: 1,
+                            total_pages: 1
+                        });
                     });
                 })
                 .catch(function (err) {
