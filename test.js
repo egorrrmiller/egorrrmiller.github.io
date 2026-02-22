@@ -177,7 +177,7 @@
         var items = [];
         var activeItem = null;
 
-        $('body').append('<style>.jackett-tracked-item { display: flex; flex-direction: row; padding: 10px; margin: 5px 20px; background: rgba(0,0,0,0.2); border-radius: 10px; align-items: center; transition: background 0.3s; }.jackett-tracked-item.focus, .jackett-tracked-item:hover { background: rgba(255,255,255,0.1); }.jackett-tracked-item__img { width: 80px; height: 120px; border-radius: 5px; object-fit: cover; margin-right: 15px; }.jackett-tracked-item__info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }.jackett-tracked-item__title { font-size: 1.2em; font-weight: bold; margin-bottom: 5px; color: #fff; }.jackett-tracked-item__time { font-size: 0.9em; color: #aaa; }.jackett-tracked-item__progress-text { font-size: 0.95em; color: #eee; margin-top: 5px; font-weight: bold; }.jackett-tracked-item__progress-bar { margin-top: 5px; width: 100%; position: relative; }.jackett-tracked-item__actions { display: flex; flex-direction: row; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }.jackett-tracked-item.focus .jackett-tracked-item__actions, .jackett-tracked-item:hover .jackett-tracked-item__actions, .jackett-tracked-item:focus-within .jackett-tracked-item__actions { opacity: 1; }.jackett-tracked-btn { padding: 10px 15px; margin-left: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); color: #fff; text-align: center; transition: background 0.3s, transform 0.2s; cursor: pointer; }.jackett-tracked-btn.focus, .jackett-tracked-btn:hover { background: #fff; color: #000; transform: scale(1.05); }</style>');
+        $('body').append('<style>.jackett-tracked-item { display: flex; flex-direction: row; padding: 10px; margin: 5px 20px; background: rgba(0,0,0,0.2); border-radius: 10px; align-items: center; transition: background 0.3s; }.jackett-tracked-item.focus, .jackett-tracked-item:hover { background: rgba(255,255,255,0.1); }.jackett-tracked-item__img { width: 80px; height: 120px; border-radius: 5px; object-fit: cover; margin-right: 15px; }.jackett-tracked-item__info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; height: 120px; }.jackett-tracked-item__title { font-size: 1.1em; font-weight: bold; margin-bottom: 4px; color: #fff; }.jackett-tracked-item__time { font-size: 0.75em; color: rgba(255,255,255,0.3); margin-top: auto; }.jackett-tracked-item__progress-text { font-size: 0.85em; color: #ccc; margin-top: 2px; }.jackett-tracked-item__progress-bar { margin-top: 6px; width: 100%; position: relative; opacity: 0.6; transform: scaleY(0.4); transform-origin: left top; }.jackett-tracked-item__actions { display: flex; flex-direction: row; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }.jackett-tracked-item.focus .jackett-tracked-item__actions, .jackett-tracked-item:hover .jackett-tracked-item__actions, .jackett-tracked-item:focus-within .jackett-tracked-item__actions { opacity: 1; }.jackett-tracked-btn { padding: 10px 15px; margin-left: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); color: #fff; text-align: center; transition: background 0.3s, transform 0.2s; cursor: pointer; }.jackett-tracked-btn.focus, .jackett-tracked-btn:hover { background: #fff; color: #000; transform: scale(1.05); }</style>');
 
         comp.create = function () {
             var _this = this;
@@ -270,7 +270,20 @@
 
             data.forEach(function (itemData) {
                 var title = itemData.title || itemData.name || 'Без названия';
-                var timeStr = itemData.last_refresh_time ? 'Обновлено: ' + itemData.last_refresh_time : '';
+
+                var formatTime = function (dateStr) {
+                    if (!dateStr || dateStr === 'Никогда') return dateStr;
+                    var d = new Date(dateStr);
+                    if (isNaN(d.getTime())) return dateStr;
+                    var day = ('0' + d.getDate()).slice(-2);
+                    var month = ('0' + (d.getMonth() + 1)).slice(-2);
+                    var year = d.getFullYear();
+                    var hours = ('0' + d.getHours()).slice(-2);
+                    var minutes = ('0' + d.getMinutes()).slice(-2);
+                    return day + '.' + month + '.' + year + ' ' + hours + ':' + minutes;
+                };
+
+                var timeStr = itemData.last_refresh_time && itemData.last_refresh_time !== 'Никогда' ? 'Обновлено: ' + formatTime(itemData.last_refresh_time) : (itemData.last_refresh_time === 'Никогда' ? 'Обновлено: Никогда' : '');
                 var poster = itemData.poster_path ? Lampa.Api.sources.tmdb.img(itemData.poster_path) : './img/img_broken.svg';
 
                 var watchedText = '';
@@ -305,9 +318,9 @@
                     '<img src="' + poster + '" class="jackett-tracked-item__img" />' +
                     '<div class="jackett-tracked-item__info">' +
                     '<div class="jackett-tracked-item__title">' + title + '</div>' +
-                    '<div class="jackett-tracked-item__time">' + timeStr + '</div>' +
                     '<div class="jackett-tracked-item__progress-text"></div>' +
                     '<div class="jackett-tracked-item__progress-bar"></div>' +
+                    '<div class="jackett-tracked-item__time">' + timeStr + '</div>' +
                     '</div>' +
                     '<div class="jackett-tracked-item__actions">' +
                     '<div class="jackett-tracked-btn btn-open selector">Открыть</div>' +
