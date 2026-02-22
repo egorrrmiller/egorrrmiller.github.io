@@ -169,7 +169,13 @@
     }
 
     function jackettTrackedComponent(object) {
-        var comp = new Lampa.InteractionCategory(object);
+        var comp = new Lampa.InteractionMain(object);
+        var scroll = new Lampa.Scroll({ mask: true, over: true });
+        var html = $('<div></div>');
+        var items = [];
+        var activeItem = null;
+
+        $('body').append('<style>.jackett-tracked-item { display: flex; flex-direction: row; padding: 10px; margin: 5px 20px; background: rgba(0,0,0,0.2); border-radius: 10px; align-items: center; transition: background 0.3s; }.jackett-tracked-item.focus { background: rgba(255,255,255,0.1); }.jackett-tracked-item__img { width: 80px; height: 120px; border-radius: 5px; object-fit: cover; margin-right: 15px; }.jackett-tracked-item__info { flex-grow: 1; display: flex; flex-direction: column; justify-content: center; }.jackett-tracked-item__title { font-size: 1.2em; font-weight: bold; margin-bottom: 5px; color: #fff; }.jackett-tracked-item__time { font-size: 0.9em; color: #aaa; }.jackett-tracked-item__actions { display: flex; flex-direction: row; align-items: center; justify-content: center; opacity: 0; transition: opacity 0.3s; }.jackett-tracked-item.focus .jackett-tracked-item__actions { opacity: 1; }.jackett-tracked-btn { padding: 10px 15px; margin-left: 10px; border-radius: 5px; background: rgba(255,255,255,0.1); color: #fff; text-align: center; transition: background 0.3s, transform 0.2s; }.jackett-tracked-btn.focus { background: #fff; color: #000; transform: scale(1.05); }</style>');
 
         comp.create = function () {
             var _this = this;
@@ -199,20 +205,24 @@
                         return;
                     }
 
-                    // For each item, try to fetch info from TMDB api
                     var promises = trackedItems.map(function (item) {
                         return new Promise(function (resolve) {
                             if (!item.tmdb_id) return resolve(null);
 
-                            // We don't know if it's movie or TV, try TV first as subscriptions are mostly for series
+                            var resolveWithTime = function (data) {
+                                if (data) {
+                                    data.last_refresh_time = item.last_refresh_time || 'Никогда';
+                                    resolve(data);
+                                } else resolve(null);
+                            };
+
                             Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'tv' }, function (tvData) {
                                 if (tvData && tvData.movie) {
-                                    resolve(tvData.movie);
+                                    resolveWithTime(tvData.movie);
                                 } else {
-                                    // Fallback to movie if tv fails
                                     Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
                                         if (movieData && movieData.movie) {
-                                            resolve(movieData.movie);
+                                            resolveWithTime(movieData.movie);
                                         } else {
                                             resolve(null);
                                         }
@@ -222,7 +232,7 @@
                                 }
                             }, function () {
                                 Lampa.Api.sources.tmdb.full({ id: item.tmdb_id, method: 'movie' }, function (movieData) {
-                                    if (movieData && movieData.movie) resolve(movieData.movie);
+                                    if (movieData && movieData.movie) resolveWithTime(movieData.movie);
                                     else resolve(null);
                                 }, function () {
                                     resolve(null);
@@ -239,79 +249,155 @@
                             return;
                         }
 
-                        _this.build({
-                            results: validItems,
-                            page: 1,
-                            total_pages: 1
-                        });
+                        _this.build(validItems);
                     });
                 })
                 .catch(function (err) {
                     console.error('JackettTracked:', err);
                     _this.empty('Ошибка загрузки данных: ' + err.message);
                 });
+
+            return this.render();
         };
 
-        comp.cardRender = function (object, element, card) {
-            card.onMenu = function () {
-                Lampa.Select.show({
-                    title: 'Действия',
-                    items: [
-                        {
-                            title: 'Перейти к карточке',
-                            open: true
-                        },
-                        {
-                            title: 'Отменить отслеживание',
-                            remove: true
-                        }
-                    ],
-                    onSelect: function (a) {
-                        if (a.open) {
-                            Lampa.Activity.push({
-                                url: element.id,
-                                title: element.title || element.name,
-                                component: 'full',
-                                id: element.id,
-                                method: element.name ? 'tv' : 'movie',
-                                card: element,
-                                source: 'tmdb'
-                            });
-                        } else if (a.remove) {
-                            var url = getBaseUrl();
-                            var uid = getUserId();
-                            if (url && uid) {
-                                Lampa.Noty.show('Удаляем...');
-                                fetch(url + '/unsubscribe?tmdb=' + element.id + '&uid=' + uid, { method: 'POST' })
-                                    .then(function (response) {
-                                        if (response.ok) {
-                                            card.destroy(); // Remove card visually
-                                            Lampa.Noty.show('Удалено из отслеживаемых');
-                                        } else {
-                                            Lampa.Noty.show('Ошибка удаления');
-                                        }
-                                    });
-                            }
-                        }
-                    },
-                    onBack: function () {
-                        Lampa.Controller.toggle('content');
+        comp.empty = function (msg) {
+            this.activity.loader(false);
+            var emptyTpl = Lampa.Template.get('list_empty');
+            if (msg) emptyTpl.find('.empty__title').text(msg);
+            html.empty().append(emptyTpl);
+        };
+
+        comp.build = function (data) {
+            var _this = this;
+            this.activity.loader(false);
+
+            scroll.render().addClass('layer--wheight');
+            html.empty().append(scroll.render());
+
+            data.forEach(function (itemData) {
+                var title = itemData.title || itemData.name || 'Без названия';
+                var timeStr = itemData.last_refresh_time ? 'Обновлено: ' + itemData.last_refresh_time : '';
+                var poster = itemData.poster_path ? Lampa.Api.sources.tmdb.img(itemData.poster_path) : './img/img_broken.svg';
+
+                var itemHtml = '<div class="jackett-tracked-item selector layer--visible layer--render">' +
+                    '<img src="' + poster + '" class="jackett-tracked-item__img" />' +
+                    '<div class="jackett-tracked-item__info">' +
+                    '<div class="jackett-tracked-item__title">' + title + '</div>' +
+                    '<div class="jackett-tracked-item__time">' + timeStr + '</div>' +
+                    '</div>' +
+                    '<div class="jackett-tracked-item__actions">' +
+                    '<div class="jackett-tracked-btn btn-open selector">Открыть</div>' +
+                    '<div class="jackett-tracked-btn btn-unfollow selector">Отменить отслеживание</div>' +
+                    '</div>' +
+                    '</div>';
+
+                var itemObj = $(itemHtml);
+
+                itemObj.on('hover:focus', function () {
+                    activeItem = itemObj;
+                    scroll.update(itemObj);
+
+                    if (itemData.backdrop_path) {
+                        var bg = Lampa.Api.sources.tmdb.img(itemData.backdrop_path);
+                        Lampa.Background.change(bg);
                     }
                 });
-            };
 
-            card.onEnter = function () {
-                // Open standard full view by default, same as Lampa's history/bookmarks
-                Lampa.Activity.push({
-                    url: element.id,
-                    title: element.title || element.name,
-                    component: 'full',
-                    id: element.id,
-                    method: element.name ? 'tv' : 'movie',
-                    card: element,
-                    source: 'tmdb'
+                itemObj.find('.btn-open').on('hover:enter', function () {
+                    Lampa.Activity.push({
+                        url: itemData.id,
+                        title: title,
+                        component: 'full',
+                        id: itemData.id,
+                        method: itemData.name ? 'tv' : 'movie',
+                        card: itemData,
+                        source: 'tmdb'
+                    });
                 });
-            };
+
+                itemObj.find('.btn-unfollow').on('hover:enter', function () {
+                    var url = getBaseUrl();
+                    var uid = getUserId();
+                    if (url && uid) {
+                        Lampa.Noty.show('Удаляем...');
+                        fetch(url + '/unsubscribe?tmdb=' + itemData.id + '&uid=' + uid, { method: 'POST' })
+                            .then(function (response) {
+                                if (response.ok) {
+                                    itemObj.remove();
+                                    Lampa.Noty.show('Удалено из отслеживаемых');
+                                    var remaining = scroll.render().find('.jackett-tracked-item');
+                                    if (remaining.length) {
+                                        Lampa.Controller.toggle('content');
+                                    } else _this.empty('Пусто');
+                                } else Lampa.Noty.show('Ошибка удаления');
+                            });
+                    }
+                });
+
+                itemObj.on('hover:enter', function () {
+                    itemObj.find('.btn-open').trigger('hover:enter');
+                });
+
+                scroll.append(itemObj);
+                items.push(itemObj);
+            });
+
+            Lampa.Controller.add('content', {
+                toggle: function () {
+                    Lampa.Controller.collectionSet(scroll.render());
+                    Lampa.Controller.collectionFocus(activeItem || items[0], scroll.render());
+                },
+                left: function () {
+                    if (Lampa.Controller.collectionDirection('left')) {
+                        var cur = Lampa.Controller.collectionCurrent();
+                        if (cur.hasClass('btn-unfollow')) Lampa.Controller.collectionFocus(cur.prev('.btn-open'), scroll.render());
+                    }
+                    else Lampa.Controller.toggle('menu');
+                },
+                right: function () {
+                    if (Lampa.Controller.collectionDirection('right')) {
+                        var cur = Lampa.Controller.collectionCurrent();
+                        if (cur.hasClass('btn-open')) Lampa.Controller.collectionFocus(cur.next('.btn-unfollow'), scroll.render());
+                        else if (cur.hasClass('jackett-tracked-item')) Lampa.Controller.collectionFocus(cur.find('.btn-open'), scroll.render());
+                    }
+                },
+                up: function () {
+                    if (Lampa.Controller.collectionDirection('up')) {
+                        var cur = Lampa.Controller.collectionCurrent();
+                        var parentItem = cur.closest('.jackett-tracked-item');
+                        if (parentItem.length && parentItem.prev().length) {
+                            Lampa.Controller.collectionFocus(parentItem.prev(), scroll.render());
+                        } else Lampa.Controller.collectionFocus(activeItem || items[0], scroll.render());
+                    }
+                },
+                down: function () {
+                    if (Lampa.Controller.collectionDirection('down')) {
+                        var cur = Lampa.Controller.collectionCurrent();
+                        var parentItem = cur.closest('.jackett-tracked-item');
+                        if (parentItem.length && parentItem.next().length) {
+                            Lampa.Controller.collectionFocus(parentItem.next(), scroll.render());
+                        }
+                    }
+                },
+                back: function () {
+                    Lampa.Activity.backward();
+                }
+            });
+
+            Lampa.Controller.toggle('content');
+
+            return this.render();
+        };
+
+        comp.render = function () {
+            return html;
+        };
+
+        comp.destroy = function () {
+            scroll.destroy();
+            html.remove();
+            items = [];
+            comp = null;
         };
 
         return comp;
