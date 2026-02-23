@@ -294,10 +294,12 @@
 
                     var htmlNode = card.render ? card.render() : null;
                     if (htmlNode && htmlNode.find) {
-                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 3px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
-                        var ageNode = htmlNode.find('.card__age');
+                        // Используем родной класс .card__age для идеального совпадения стилей
+                        var timeHtml = '<div class="card__age" style="margin-top: 1px;">Обновлено: ' + formattedTime + '</div>';
+                        var ageNode = htmlNode.find('.card__age').first();
+
                         if (ageNode.length) {
-                            ageNode.before(timeHtml);
+                            ageNode.after(timeHtml);
                         } else {
                             htmlNode.find('.card__title').after(timeHtml);
                         }
