@@ -294,14 +294,14 @@
 
                     var htmlNode = card.render ? card.render() : null;
                     if (htmlNode && htmlNode.find) {
-                        // Используем оригинальный стиль с полупрозрачным текстом
-                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 2px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
-                        var ageNode = htmlNode.find('.card__age').first();
+                        // Используем абсолютное позиционирование, чтобы прибить текст к самому низу карточки
+                        var timeHtml = '<div class="jackett-time" style="position: absolute; bottom: -20px; left: 0; width: 100%; text-align: center; font-size: 0.75em; color: rgba(255,255,255,0.4); font-weight: normal; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Обновлено: ' + formattedTime + '</div>';
 
-                        if (ageNode.length) {
-                            ageNode.after(timeHtml);
+                        var viewNode = htmlNode.find('.card__view');
+                        if (viewNode.length) {
+                            viewNode.append(timeHtml);
                         } else {
-                            htmlNode.find('.card__title').after(timeHtml);
+                            htmlNode.append(timeHtml);
                         }
                     }
                 }
