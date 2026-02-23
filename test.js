@@ -95,7 +95,9 @@
 
         if (!url || !card.id || !uid) return;
 
-        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
+        var reqMethod = method || card.media || (card.name ? 'tv' : 'movie');
+        if (reqMethod !== 'tv' && reqMethod !== 'movie') reqMethod = card.name ? 'tv' : 'movie';
+
         var requestUrl = url + '/check-subscribe?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
         btn.addClass('loading disabled');
@@ -138,7 +140,10 @@
         }
 
         var isSubscribed = btn.hasClass('active');
-        var reqMethod = method || card.type || card.media || (card.name ? 'tv' : 'movie');
+        var isSubscribed = btn.hasClass('active');
+        var reqMethod = method || card.media || (card.name ? 'tv' : 'movie');
+        if (reqMethod !== 'tv' && reqMethod !== 'movie') reqMethod = card.name ? 'tv' : 'movie';
+
         var endpoint = isSubscribed ? '/unsubscribe' : '/subscribe';
         var requestUrl = url + endpoint + '?tmdb=' + card.id + '&media=' + reqMethod + '&uid=' + uid;
 
