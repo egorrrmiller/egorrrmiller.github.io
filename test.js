@@ -294,14 +294,25 @@
 
                     var htmlNode = card.render ? card.render() : null;
                     if (htmlNode && htmlNode.find) {
-                        // Используем абсолютное позиционирование, чтобы прибить текст к самому низу карточки
-                        var timeHtml = '<div class="jackett-time" style="position: absolute; bottom: -20px; left: 0; width: 100%; text-align: center; font-size: 0.75em; color: rgba(255,255,255,0.4); font-weight: normal; font-family: sans-serif; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Обновлено: ' + formattedTime + '</div>';
+                        // Фиксируем высоту заголовка на 3 строчки (как у самой длинной карточки), 
+                        // чтобы год и дата обновления всегда стояли на одной идеальной линии.
+                        var titleNode = htmlNode.find('.card__title');
+                        titleNode.css({
+                            'min-height': '3.9em',
+                            'display': '-webkit-box',
+                            '-webkit-line-clamp': '3',
+                            '-webkit-box-orient': 'vertical',
+                            'overflow': 'hidden'
+                        });
 
-                        var viewNode = htmlNode.find('.card__view');
-                        if (viewNode.length) {
-                            viewNode.append(timeHtml);
+                        // Возвращаем текст под год
+                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 2px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
+                        var ageNode = htmlNode.find('.card__age').first();
+
+                        if (ageNode.length) {
+                            ageNode.after(timeHtml);
                         } else {
-                            htmlNode.append(timeHtml);
+                            titleNode.after(timeHtml);
                         }
                     }
                 }
