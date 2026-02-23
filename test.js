@@ -294,19 +294,18 @@
 
                     var htmlNode = card.render ? card.render() : null;
                     if (htmlNode && htmlNode.find) {
-                        // Фиксируем высоту заголовка на 3 строчки (как у самой длинной карточки), 
-                        // чтобы год и дата обновления всегда стояли на одной идеальной линии.
+                        // Фиксируем высоту заголовка на 2 строчки
                         var titleNode = htmlNode.find('.card__title');
                         titleNode.css({
-                            'min-height': '3.9em',
+                            'min-height': '2.6em',
                             'display': '-webkit-box',
-                            '-webkit-line-clamp': '3',
+                            '-webkit-line-clamp': '2',
                             '-webkit-box-orient': 'vertical',
                             'overflow': 'hidden'
                         });
 
-                        // Возвращаем текст под год
-                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 2px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
+                        // Возвращаем текст под год + добавляем margin-bottom, чтобы оттолкнуть нижний ряд
+                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 2px; margin-bottom: 10px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
                         var ageNode = htmlNode.find('.card__age').first();
 
                         if (ageNode.length) {
