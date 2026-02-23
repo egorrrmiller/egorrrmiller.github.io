@@ -1,6 +1,7 @@
 (function () {
     'use strict';
 
+    // Добавляем стили для анимации
     var style = document.createElement('style');
     style.innerHTML = `
         @keyframes spin-force { 100% { transform: rotate(360deg); } }
@@ -17,11 +18,11 @@
 
     Lampa.Listener.follow('activity', function (e) {
         if (e.type === 'start' && e.component === 'torrents') {
-            var waitFilter = setInterval(function(){
+            var waitFilter = setInterval(function () {
                 var filter = $('.torrent-filter');
                 if (filter.length) {
                     clearInterval(waitFilter);
-                    
+
                     if (filter.find('.filter--reload').length) return;
 
                     var btn = $(`
@@ -34,7 +35,7 @@
 
                     filter.find('.filter--sort').after(btn);
 
-                    btn.on('hover:enter', function () {
+                    btn.on('hover:enter click', function () {
                         forceSearch(btn);
                     });
                 }
@@ -43,6 +44,7 @@
     });
 
     function forceSearch(btn) {
+        // Блокируем кнопку и запускаем анимацию
         if (btn.hasClass('disabled')) return;
         btn.addClass('loading disabled');
 
@@ -77,28 +79,28 @@
             try {
                 u += '&title=' + encodeURIComponent(movie.title);
                 u += '&title_original=' + encodeURIComponent(movie.original_title || movie.original_name);
-                
+
                 var is_serial = (movie.original_name || movie.number_of_seasons > 0) ? '2' : '1';
                 u += '&is_serial=' + is_serial;
 
                 if (movie.genres) {
-                    var genres = movie.genres.map(function(a) { return a.name; }).join(',');
+                    var genres = movie.genres.map(function (a) { return a.name; }).join(',');
                     u += '&genres=' + encodeURIComponent(genres);
                 }
 
                 var cat = (movie.number_of_seasons > 0 ? 5000 : 2000) + (movie.original_language == 'ja' ? ',5070' : '');
                 u += '&Category[]=' + cat;
-            } catch (e) {}
+            } catch (e) { }
         }
 
         u += '&force_search=true';
 
-        Lampa.Noty.show('Начат принудительный поиск на трекерах');
+        Lampa.Noty.show('Начат принудительный поиск');
 
         $.ajax({
             url: u,
             type: 'GET',
-            success: function() {
+            success: function () {
                 if (activity.component === 'torrents') {
                     Lampa.Activity.replace({
                         component: 'torrents',
@@ -107,10 +109,11 @@
                         page: 1
                     });
                 }
-                
+                // Кнопка удалится вместе с активностью при перезагрузке, так что снимать классы не обязательно,
+                // но для порядка можно (если перезагрузка не мгновенная)
                 btn.removeClass('loading disabled');
             },
-            error: function() {
+            error: function () {
                 Lampa.Noty.show('Ошибка запроса Force Search');
                 btn.removeClass('loading disabled');
             }
