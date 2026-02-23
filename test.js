@@ -294,7 +294,13 @@
 
                     var htmlNode = card.render ? card.render() : null;
                     if (htmlNode && htmlNode.find) {
-                        htmlNode.find('.card__title').after('<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 3px; font-weight: normal; font-family: sans-serif;">Обновлено:<br>' + formattedTime + '</div>');
+                        var timeHtml = '<div class="jackett-time" style="font-size: 0.8em; color: rgba(255,255,255,0.4); margin-top: 3px; font-weight: normal; font-family: sans-serif;">Обновлено: ' + formattedTime + '</div>';
+                        var ageNode = htmlNode.find('.card__age');
+                        if (ageNode.length) {
+                            ageNode.before(timeHtml);
+                        } else {
+                            htmlNode.find('.card__title').after(timeHtml);
+                        }
                     }
                 }
             }
