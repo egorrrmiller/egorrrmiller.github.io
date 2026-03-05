@@ -74,21 +74,9 @@
      * Опрашивает VLC, считывает текущий файл и обновляет тайлайн в Lampa
      */
     function startCustomTimecodePolling(port, password) {
-        // Гарантированная очистка любых дублей (используем и локальный, и глобальный указатель)
-        var clearExisting = function () {
-            if (vlcPollingInterval) {
-                console.log(plugin_name, 'Остановка локального таймера');
-                clearInterval(vlcPollingInterval);
-                vlcPollingInterval = null;
-            }
-            if (window.lampa_vlc_polling_timer) {
-                console.log(plugin_name, 'Остановка глобального таймера');
-                clearInterval(window.lampa_vlc_polling_timer);
-                window.lampa_vlc_polling_timer = null;
-            }
-        };
-
-        clearExisting();
+        // Уникальный ID для этой цепочки таймеров
+        var currentRunId = Math.random().toString(36).substring(7);
+        window.lampa_vlc_last_run_id = currentRunId;
 
         var failedAttempts = 0;
         var MAX_FAILED_ATTEMPTS = 15;
@@ -100,11 +88,14 @@
             return url;
         }
 
-        console.log(plugin_name, 'Мониторинг VLC: ' + getVLCURL() + ' (пароль: ' + password + ')');
+        console.log(plugin_name, 'Мониторинг [' + currentRunId + ']: ' + getVLCURL() + ' (пароль: ' + password + ')');
 
-        window.lampa_vlc_polling_timer = setInterval(function () {
-            // Если таймер вдруг "потерял" связь с актуальным ID (защита от утечек)
-            var currentId = window.lampa_vlc_polling_timer;
+        var poll = function () {
+            // Если ID сменился (запущен новый запуск), эта цепочка должна остановиться
+            if (window.lampa_vlc_last_run_id !== currentRunId) {
+                console.log(plugin_name, 'Остановка устаревшей цепочки:', currentRunId);
+                return;
+            }
 
             var headers = {
                 'Authorization': 'Basic ' + btoa(':' + password)
@@ -112,7 +103,7 @@
 
             fetch(getVLCURL(), { headers: headers })
                 .then(function (response) {
-                    if (!response.ok) throw new Error('VLC API returned ' + response.status);
+                    if (!response.ok) throw new Error('VLC API error: ' + response.status);
                     return response.json();
                 })
                 .then(function (status) {
@@ -123,36 +114,29 @@
                     if (status.information && status.information.category && status.information.category.meta) {
                         var title = status.information.category.meta.title || '';
                         var filename = status.information.category.meta.filename || '';
-
                         var hashMatch = (title + filename).match(/LampaHash="([^"]+)"/);
-                        if (hashMatch) {
-                            currentLampaHash = hashMatch[1];
-                        }
+                        if (hashMatch) currentLampaHash = hashMatch[1];
                     }
 
                     // Если файл в VLC сменился
                     if (currentLampaHash && window.lampa_vlc_current_hash && currentLampaHash !== window.lampa_vlc_current_hash) {
-                        console.log(plugin_name, 'Переход на серию:', currentLampaHash);
-
+                        console.log(plugin_name, 'Смена серии на:', currentLampaHash);
                         if (window.lampa_vlc_playlist_items) {
                             var oldItem = window.lampa_vlc_playlist_items.find(function (i) {
                                 return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
                             });
-
                             if (oldItem && oldItem.timeline) {
                                 oldItem.timeline.percent = 100;
                                 oldItem.timeline.time = oldItem.timeline.duration || 1;
                                 Lampa.Timeline.update(oldItem.timeline);
                             }
                         }
-
                         var nextItem = null;
                         if (window.lampa_vlc_playlist_items) {
                             nextItem = window.lampa_vlc_playlist_items.find(function (i) {
                                 return i.timeline && i.timeline.hash === currentLampaHash;
                             });
                         }
-
                         if (nextItem) {
                             window.lampa_vlc_current_hash = currentLampaHash;
                             Lampa.Noty.show('Серия: ' + nextItem.title);
@@ -176,21 +160,23 @@
                             Lampa.Timeline.update(activeItem.timeline);
                         }
                     }
+
+                    // Планируем следующий тик
+                    setTimeout(poll, POLLING_INTERVAL_MS);
                 })
                 .catch(function (error) {
                     failedAttempts++;
-                    console.log(plugin_name, 'Ожидание ответа от VLC... (' + failedAttempts + '/' + MAX_FAILED_ATTEMPTS + ')');
+                    console.log(plugin_name, '[' + currentRunId + '] Ошибка (' + failedAttempts + '/' + MAX_FAILED_ATTEMPTS + '):', error.message);
 
-                    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
-                        console.error(plugin_name, 'VLC не ответил вовремя, останавливаем поллинг');
-                        clearInterval(currentId);
-                        if (window.lampa_vlc_polling_timer === currentId) window.lampa_vlc_polling_timer = null;
-                        if (vlcPollingInterval === currentId) vlcPollingInterval = null;
+                    if (failedAttempts < MAX_FAILED_ATTEMPTS) {
+                        setTimeout(poll, POLLING_INTERVAL_MS);
+                    } else {
+                        console.error(plugin_name, 'Цепочка [' + currentRunId + '] остановлена после ' + MAX_FAILED_ATTEMPTS + ' ошибок');
                     }
                 });
-        }, POLLING_INTERVAL_MS);
+        };
 
-        vlcPollingInterval = window.lampa_vlc_polling_timer;
+        poll();
     }
 
     /**
@@ -286,13 +272,20 @@
                                     // Запускаем VLC, передавая ему M3U плейлист
                                     var startTime = (event.element.timeline && event.element.timeline.time ? event.element.timeline.time : 0) * 1000;
 
-                                    // Получаем настройки Lampa
-                                    var port = Lampa.Storage.field('vlc_api_port') || '3999';
-                                    var password = Lampa.Storage.field('vlc_api_password') || '123456';
+                                    // Получаем настройки Lampa (пробуем разные ключи для надежности)
+                                    var port = '3999'; // Дефолт из vlc.js
+                                    var password = '123456'; // Дефолт из vlc.js
 
-                                    // Если пользователь изменил порт/пароль в Lampa player Settings
-                                    if (Lampa.Storage.field('player_port')) port = Lampa.Storage.field('player_port');
-                                    if (Lampa.Storage.field('player_password')) password = Lampa.Storage.field('player_password');
+                                    try {
+                                        // Пробуем достать из хранилища (Settings.field или Storage.get)
+                                        var p_port = Lampa.Storage.get('vlc_api_port') || Lampa.Storage.get('player_vlc_port');
+                                        var p_pass = Lampa.Storage.get('vlc_api_password') || Lampa.Storage.get('player_vlc_pass');
+
+                                        if (p_port) port = p_port;
+                                        if (p_pass) password = p_pass;
+                                    } catch (e) {
+                                        console.log(plugin_name, 'Не удалось прочитать настройки, используем дефолты');
+                                    }
 
                                     var fullscreen = Lampa.Storage.field('vlc_fullscreen') !== false;
                                     if (Lampa.Storage.field('player_fullscreen') === false) fullscreen = false;
