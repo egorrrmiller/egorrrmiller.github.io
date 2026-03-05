@@ -76,6 +76,9 @@
     function startCustomTimecodePolling(port, password) {
         if (vlcPollingInterval) clearInterval(vlcPollingInterval);
 
+        var failedAttempts = 0;
+        var MAX_FAILED_ATTEMPTS = 10; // Даем 50 секунд на раздумья (при интервале 5с)
+
         function getVLCURL(port) {
             var proxy = !['localhost', 'file://'].includes(window.location.origin);
             var url = 'http://localhost:' + port + '/requests/status.json';
@@ -83,21 +86,27 @@
             return url;
         }
 
+        console.log(plugin_name, 'Запущен мониторинг VLC (интервал ' + POLLING_INTERVAL_MS + 'мс)');
+
         vlcPollingInterval = setInterval(function () {
             var headers = {
                 'Authorization': 'Basic ' + btoa(':' + password)
             };
 
             fetch(getVLCURL(port), { headers: headers })
-                .then(function (response) { return response.json(); })
+                .then(function (response) {
+                    if (!response.ok) throw new Error('VLC API returned ' + response.status);
+                    return response.json();
+                })
                 .then(function (status) {
+                    failedAttempts = 0; // Сбрасываем счетчик при успехе
+
                     // Парсим метаданные: ищем LampaHash
                     var currentLampaHash = null;
                     if (status.information && status.information.category && status.information.category.meta) {
-                        var title = status.information.category.meta.title || ''; // наш LampaHash в titles/filename
+                        var title = status.information.category.meta.title || '';
                         var filename = status.information.category.meta.filename || '';
 
-                        // Ищем строчку вида LampaHash="xxx" (которую мы прописали в EXTINF) в названии файла/тайтле
                         var hashMatch = (title + filename).match(/LampaHash="([^"]+)"/);
                         if (hashMatch) {
                             currentLampaHash = hashMatch[1];
@@ -106,9 +115,8 @@
 
                     // Если файл в VLC сменился
                     if (currentLampaHash && window.lampa_vlc_current_hash && currentLampaHash !== window.lampa_vlc_current_hash) {
-                        console.log(plugin_name, 'Обнаружен переход на следующую серию:', currentLampaHash);
+                        console.log(plugin_name, 'Переход на серию:', currentLampaHash);
 
-                        // 1. Помечаем старую серию как 100% просмотренную
                         if (window.lampa_vlc_playlist_items) {
                             var oldItem = window.lampa_vlc_playlist_items.find(function (i) {
                                 return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
@@ -121,7 +129,6 @@
                             }
                         }
 
-                        // 2. Ищем новую серию
                         var nextItem = null;
                         if (window.lampa_vlc_playlist_items) {
                             nextItem = window.lampa_vlc_playlist_items.find(function (i) {
@@ -129,21 +136,20 @@
                             });
                         }
 
-                        // 3. Переключаем фокус Lampa 
                         if (nextItem) {
                             window.lampa_vlc_current_hash = currentLampaHash;
-                            Lampa.Noty.show('Началась новая серия: ' + nextItem.title);
+                            Lampa.Noty.show('Серия: ' + nextItem.title);
                         }
                     }
 
-                    // Обновляем таймкод текущей серии (если она активна)
-                    if (status.time && status.length && window.lampa_vlc_playlist_items) {
+                    // Обновляем таймкод
+                    if (status.time !== undefined && status.length && window.lampa_vlc_playlist_items) {
                         var currentTime = status.time / 1000;
                         var duration = status.length / 1000;
                         var percent = Math.round((currentTime / duration) * 100);
 
                         var activeItem = window.lampa_vlc_playlist_items.find(function (i) {
-                            return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
+                            return i.timeline && i.timeline.hash === (currentLampaHash || window.lampa_vlc_current_hash);
                         });
 
                         if (activeItem && activeItem.timeline) {
@@ -155,9 +161,14 @@
                     }
                 })
                 .catch(function (error) {
-                    console.error(plugin_name, 'VLC отключен, останавливаем поллинг');
-                    clearInterval(vlcPollingInterval);
-                    vlcPollingInterval = null;
+                    failedAttempts++;
+                    console.log(plugin_name, 'Ожидание ответа от VLC... (' + failedAttempts + '/' + MAX_FAILED_ATTEMPTS + ')');
+
+                    if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
+                        console.error(plugin_name, 'VLC не ответил вовремя, останавливаем поллинг');
+                        clearInterval(vlcPollingInterval);
+                        vlcPollingInterval = null;
+                    }
                 });
         }, POLLING_INTERVAL_MS);
     }
