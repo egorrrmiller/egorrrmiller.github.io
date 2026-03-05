@@ -168,8 +168,8 @@
     Lampa.Listener.follow('app', function (e) {
         if (e.type === 'ready') {
 
-            // 1. Добавляем кнопку "Смотреть весь плейлист" в контектное меню (долгий тап) торрентов
-            Lampa.Listener.follow('torrent', function (event) {
+            // 1. Добавляем кнопку "Смотреть весь плейлист" в контектное меню (долгий тап) файлов торрента
+            Lampa.Listener.follow('torrent_file', function (event) {
                 if (event.type === 'onlong' && fs) {
                     var menu = event.menu;
                     menu.unshift({
@@ -191,20 +191,27 @@
                                 // Устанавливаем флаг
                                 window.lampa_vlc_playlist_enabled = true;
 
-                                // Полностью свой обработчик запуска VLC Playlist
-                                if (event.element && event.element.url && event.items) {
+                                // Логируем событие для отладки
+                                console.log(plugin_name, 'Event data:', event);
+
+                                // Пытаемся собрать список файлов из разных источников
+                                var items = event.items || (event.params && event.params.files) || [];
+                                var element = event.element || {};
+
+                                // Робастная проверка: нам нужен хотя бы один файл и способ достать URL
+                                if (element && items.length > 0) {
                                     console.log(plugin_name, 'Запускаем кастомный плейлист VLC напрямую...');
 
                                     // Сохраняем элементы раздачи
-                                    window.lampa_vlc_playlist_items = event.items;
+                                    window.lampa_vlc_playlist_items = items;
 
-                                    if (event.element.timeline) {
-                                        window.lampa_vlc_current_hash = event.element.timeline.hash;
+                                    if (element.timeline) {
+                                        window.lampa_vlc_current_hash = element.timeline.hash;
                                     }
 
                                     // Индекс текущего элемента вручную
-                                    var startIndex = event.items.findIndex(function (i) {
-                                        return i === event.element || (i.timeline && event.element.timeline && i.timeline.hash === event.element.timeline.hash);
+                                    var startIndex = items.findIndex(function (i) {
+                                        return i === element || (i.timeline && element.timeline && i.timeline.hash === element.timeline.hash);
                                     });
                                     if (startIndex === -1) startIndex = 0;
 
@@ -213,8 +220,14 @@
                                         var content = ['#EXTM3U'];
                                         for (var i = startIndex; i < playlist_items.length; i++) {
                                             var item = playlist_items[i];
-                                            var url = typeof item.url === 'string' ? item.url : '';
-                                            if (url) {
+
+                                            // Пытаемся получить URL
+                                            var url = item.url;
+                                            if (!url && item.path && Lampa.Torserver && event.params && event.params.hash) {
+                                                url = Lampa.Torserver.stream(item.path, event.params.hash, item.id);
+                                            }
+
+                                            if (url && typeof url === 'string') {
                                                 url = url.replace('&preload', '&play');
                                                 var hash = item.timeline ? item.timeline.hash : ('hash_' + i);
                                                 var title = item.title || item.fname || ('Episode ' + (i + 1));
@@ -228,7 +241,7 @@
                                         return content.join('\n');
                                     };
 
-                                    var m3uContent = generateM3UDirect(startIndex, event.items);
+                                    var m3uContent = generateM3UDirect(startIndex, items);
 
                                     // Сохраняем M3U на диск
                                     try {
