@@ -109,54 +109,53 @@
                         console.log(plugin_name, 'Обнаружен переход на следующую серию:', currentLampaHash);
 
                         // 1. Помечаем старую серию как 100% просмотренную
-                        var oldData = Lampa.Player.playdata();
-                        if (oldData && oldData.timeline && oldData.timeline.handler) {
-                            // Имитируем завершение (100% просмотр)
-                            oldData.timeline.handler(100, oldData.timeline.duration || 1, oldData.timeline.duration || 1);
+                        if (window.lampa_vlc_playlist_items) {
+                            var oldItem = window.lampa_vlc_playlist_items.find(function (i) {
+                                return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
+                            });
+
+                            if (oldItem && oldItem.timeline) {
+                                oldItem.timeline.percent = 100;
+                                oldItem.timeline.time = oldItem.timeline.duration || 1;
+                                Lampa.Timeline.update(oldItem.timeline);
+                            }
                         }
 
-                        // 2. Ищем новую серию в плейлисте Lampa
-                        var playlist = Lampa.Player.playlist() || [];
-                        var nextItem = playlist.find(function (item) {
-                            return item.timeline && item.timeline.hash === currentLampaHash;
-                        });
+                        // 2. Ищем новую серию
+                        var nextItem = null;
+                        if (window.lampa_vlc_playlist_items) {
+                            nextItem = window.lampa_vlc_playlist_items.find(function (i) {
+                                return i.timeline && i.timeline.hash === currentLampaHash;
+                            });
+                        }
 
                         // 3. Переключаем фокус Lampa 
                         if (nextItem) {
                             window.lampa_vlc_current_hash = currentLampaHash;
-                            // Подменяем playdata плеера на новый элемент, чтобы тайлайн писался по новому хэшу
-                            // Lampa.Player.playdata() возвращает ссылку на work, но сеттера нет. 
-                            // Мы можем обновить внутренности timeline
-                            if (oldData) {
-                                oldData.timeline = nextItem.timeline;
-                                oldData.url = nextItem.url;
-                            }
-
-                            // Выводим уведомление о начале новой серии в интерфейс (опционально)
                             Lampa.Noty.show('Началась новая серия: ' + nextItem.title);
-
-                            // Перерисовываем UI Lampa (если панель открыта)
-                            if (Lampa.Player.opened()) {
-                                Lampa.Player.stat(); // или другое обновление
-                            }
                         }
                     }
 
                     // Обновляем таймкод текущей серии (если она активна)
-                    if (status.time && status.length) {
+                    if (status.time && status.length && window.lampa_vlc_playlist_items) {
                         var currentTime = status.time / 1000;
                         var duration = status.length / 1000;
                         var percent = Math.round((currentTime / duration) * 100);
 
-                        var currentData = Lampa.Player.playdata();
-                        if (currentData && currentData.timeline && currentData.timeline.handler) {
-                            currentData.timeline.handler(percent, currentTime, duration);
+                        var activeItem = window.lampa_vlc_playlist_items.find(function (i) {
+                            return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
+                        });
+
+                        if (activeItem && activeItem.timeline) {
+                            activeItem.timeline.percent = percent;
+                            activeItem.timeline.time = currentTime;
+                            activeItem.timeline.duration = duration;
+                            Lampa.Timeline.update(activeItem.timeline);
                         }
                     }
                 })
                 .catch(function (error) {
-                    console.error(plugin_name, 'Ошибка получения timecode:', error);
-                    window.lampa_vlc_playlist_recording = false;
+                    console.error(plugin_name, 'VLC отключен, останавливаем поллинг');
                     clearInterval(vlcPollingInterval);
                     vlcPollingInterval = null;
                 });
@@ -192,33 +191,93 @@
                                 // Устанавливаем флаг
                                 window.lampa_vlc_playlist_enabled = true;
 
-                                // Запускаем стандартный плеер Lampa (далее перехватим)
-                                if (event.element && typeof Lampa.Torrent !== 'undefined') {
-                                    // Нужно получить объект фильма
-                                    var activity = Lampa.Activity.active();
-                                    var movie = activity ? activity.card : {};
-                                    event.element.poster = movie ? movie.img : '';
-
-                                    // Устанавливаем флаги на более долгий срок, 
-                                    // т.к. Lampa грузит серии асинхронно или через прелоадер.
-                                    window.lampa_vlc_playlist_enabled = true;
+                                // Полностью свой обработчик запуска VLC Playlist
+                                if (event.element && event.element.url && event.items) {
+                                    console.log(plugin_name, 'Запускаем кастомный плейлист VLC напрямую...');
 
                                     // Сохраняем элементы раздачи
                                     window.lampa_vlc_playlist_items = event.items;
 
-                                    // Отключаем на случай, если мы не дошли до openPlayer
-                                    setTimeout(function () {
-                                        window.lampa_vlc_playlist_enabled = false;
-                                        window.lampa_vlc_playlist_items = null;
-                                    }, 10000); // 10 сек таймаут
+                                    if (event.element.timeline) {
+                                        window.lampa_vlc_current_hash = event.element.timeline.hash;
+                                    }
 
-                                    if (event.item) {
-                                        event.item.trigger('hover:enter');
+                                    // Индекс текущего элемента вручную
+                                    var startIndex = event.items.findIndex(function (i) {
+                                        return i === event.element || (i.timeline && event.element.timeline && i.timeline.hash === event.element.timeline.hash);
+                                    });
+                                    if (startIndex === -1) startIndex = 0;
+
+                                    // Передаем свой startIndex в генератор
+                                    var generateM3UDirect = function (startIndex, playlist_items) {
+                                        var content = ['#EXTM3U'];
+                                        for (var i = startIndex; i < playlist_items.length; i++) {
+                                            var item = playlist_items[i];
+                                            var url = typeof item.url === 'string' ? item.url : '';
+                                            if (url) {
+                                                url = url.replace('&preload', '&play');
+                                                var hash = item.timeline ? item.timeline.hash : ('hash_' + i);
+                                                var title = item.title || item.fname || ('Episode ' + (i + 1));
+                                                if (typeof title === 'string') {
+                                                    title = title.replace(/<[^>]*>?/gm, '');
+                                                }
+                                                content.push('#EXTINF:-1 LampaHash="' + hash + '",' + title);
+                                                content.push(url);
+                                            }
+                                        }
+                                        return content.join('\n');
+                                    };
+
+                                    var m3uContent = generateM3UDirect(startIndex, event.items);
+
+                                    // Сохраняем M3U на диск
+                                    try {
+                                        fs.writeFileSync(M3U_PATH, m3uContent, 'utf8');
+                                    } catch (err) {
+                                        console.error(plugin_name, 'Не удалось записать M3U', err);
+                                        Lampa.Noty.show('Ошибка создания плейлиста VLC');
+                                        return;
+                                    }
+
+                                    // Запускаем VLC, передавая ему M3U плейлист
+                                    var startTime = (event.element.timeline && event.element.timeline.time ? event.element.timeline.time : 0) * 1000;
+
+                                    // Получаем настройки Lampa
+                                    var port = Lampa.Storage.field('vlc_api_port') || '3999';
+                                    var password = Lampa.Storage.field('vlc_api_password') || '123456';
+
+                                    // Если пользователь изменил порт/пароль в Lampa player Settings
+                                    if (Lampa.Storage.field('player_port')) port = Lampa.Storage.field('player_port');
+                                    if (Lampa.Storage.field('player_password')) password = Lampa.Storage.field('player_password');
+
+                                    var fullscreen = Lampa.Storage.field('vlc_fullscreen') !== false;
+                                    if (Lampa.Storage.field('player_fullscreen') === false) fullscreen = false;
+
+                                    var vlcArgs = [
+                                        '--extraintf=http',
+                                        '--http-host=localhost',
+                                        '--http-port=' + port,
+                                        '--http-password=' + password,
+                                        '--start-time=' + startTime,
+                                        '--play-and-exit',
+                                        '--no-loop',
+                                        M3U_PATH
+                                    ];
+
+                                    if (fullscreen) vlcArgs.push('--fullscreen');
+
+                                    var playerPath = Lampa.Storage.field('player_nw_path');
+                                    if (fs.existsSync(playerPath)) {
+                                        spawn(playerPath, vlcArgs);
+                                        Lampa.Noty.show('VLC запущен (режим плейлиста)');
+
+                                        // Запускаем свой поллер напрямую
+                                        startCustomTimecodePolling(port, password);
                                     } else {
-                                        Lampa.Torrent.start(event.element, movie);
+                                        Lampa.Noty.show(Lampa.Lang.translate('player_not_found') + ': ' + playerPath);
                                     }
                                 } else {
-                                    Lampa.Noty.show('Не удалось запустить торрент');
+                                    Lampa.Noty.show('Не удалось запустить плейлист');
                                 }
                                 return;
                             }
@@ -233,81 +292,7 @@
                 }
             });
 
-            // 2. Перехватываем попытки запустить VLC
-            var originalOpenPlayer = Lampa.VLC ? Lampa.VLC.openPlayer : null;
-            if (originalOpenPlayer && fs) {
-                Lampa.VLC.openPlayer = function (url, data, options) {
-                    options = options || {};
-                    var port = options.port || 3999;
-                    var password = options.password || '123456';
-                    var fullscreen = options.fullscreen !== false;
-
-                    // Если юзер нажал обычный "Play" (не через нашу кнопку), отдаем стандартному VLC Lampa
-                    if (!window.lampa_vlc_playlist_enabled) {
-                        return originalOpenPlayer.apply(this, arguments);
-                    }
-
-                    // Очищаем флаг на будущее
-                    window.lampa_vlc_playlist_enabled = false;
-
-                    console.log(plugin_name, 'Запускаем кастомный плейлист VLC...');
-
-                    // Берем плейлист либо из Player, либо сохраненный нами (если Player.playlist еще не обновился)
-                    var playlist = window.lampa_vlc_playlist_items || Lampa.Player.playlist() || [];
-
-                    if (playlist.length === 0) {
-                        // Если плейлиста нет, запускаем стандартно
-                        console.log(plugin_name, 'Плейлист пуст, откат на стандартный плеер');
-                        return originalOpenPlayer.apply(this, arguments);
-                    }
-
-                    // Генерируем M3U
-                    if (data.timeline) {
-                        window.lampa_vlc_current_hash = data.timeline.hash;
-                    }
-                    var m3uContent = generateM3U(url, playlist);
-
-                    // Сохраняем M3U на диск
-                    try {
-                        fs.writeFileSync(M3U_PATH, m3uContent, 'utf8');
-                    } catch (err) {
-                        console.error(plugin_name, 'Не удалось записать M3U', err);
-                        Lampa.Noty.show('Ошибка создания плейлиста VLC');
-                        return originalOpenPlayer.apply(this, arguments);
-                    }
-
-                    // Запускаем VLC, передавая ему M3U плейлист
-                    var startTime = (data.timeline && data.timeline.time ? data.timeline.time : 0) * 1000;
-                    var vlcArgs = [
-                        '--extraintf=http',
-                        '--http-host=localhost',
-                        '--http-port=' + port,
-                        '--http-password=' + password,
-                        '--start-time=' + startTime,
-                        '--play-and-exit',
-                        '--no-loop',
-                        M3U_PATH
-                    ];
-
-                    if (fullscreen) vlcArgs.push('--fullscreen');
-
-                    var playerPath = Lampa.Storage.field('player_nw_path');
-                    if (fs.existsSync(playerPath)) {
-                        spawn(playerPath, vlcArgs);
-                        Lampa.Noty.show('VLC запущен (режим плейлиста)');
-                    } else {
-                        Lampa.Noty.show(Lampa.Lang.translate('player_not_found') + ': ' + playerPath);
-                        return;
-                    }
-
-                    // Перестаем слушать встроенный пуллинг Lampa и запускаем свой
-                    setTimeout(function () {
-                        Lampa.VLC.stopTimecodePolling();
-                        window.lampa_vlc_playlist_recording = true;
-                        startCustomTimecodePolling(port, password);
-                    }, 5000);
-                };
-            }
+            // 2. Перехват Lampa.VLC больше не требуется, т.к. мы запускаем VLC напрямую в событии select!
         }
     });
 
