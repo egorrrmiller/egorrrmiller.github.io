@@ -74,15 +74,24 @@
      * Опрашивает VLC, считывает текущий файл и обновляет тайлайн в Lampa
      */
     function startCustomTimecodePolling(port, password) {
-        if (vlcPollingInterval) {
-            console.log(plugin_name, 'Остановка предыдущего мониторинга');
-            clearInterval(vlcPollingInterval);
-            vlcPollingInterval = null;
-        }
+        // Гарантированная очистка любых дублей (используем и локальный, и глобальный указатель)
+        var clearExisting = function () {
+            if (vlcPollingInterval) {
+                console.log(plugin_name, 'Остановка локального таймера');
+                clearInterval(vlcPollingInterval);
+                vlcPollingInterval = null;
+            }
+            if (window.lampa_vlc_polling_timer) {
+                console.log(plugin_name, 'Остановка глобального таймера');
+                clearInterval(window.lampa_vlc_polling_timer);
+                window.lampa_vlc_polling_timer = null;
+            }
+        };
+
+        clearExisting();
 
         var failedAttempts = 0;
-        var MAX_FAILED_ATTEMPTS = 15; // Даем больше времени
-        var currentIntervalId = null;
+        var MAX_FAILED_ATTEMPTS = 15;
 
         function getVLCURL() {
             var proxy = !['localhost', 'file://'].includes(window.location.origin);
@@ -93,7 +102,10 @@
 
         console.log(plugin_name, 'Мониторинг VLC: ' + getVLCURL() + ' (пароль: ' + password + ')');
 
-        currentIntervalId = setInterval(function () {
+        window.lampa_vlc_polling_timer = setInterval(function () {
+            // Если таймер вдруг "потерял" связь с актуальным ID (защита от утечек)
+            var currentId = window.lampa_vlc_polling_timer;
+
             var headers = {
                 'Authorization': 'Basic ' + btoa(':' + password)
             };
@@ -171,13 +183,14 @@
 
                     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
                         console.error(plugin_name, 'VLC не ответил вовремя, останавливаем поллинг');
-                        clearInterval(currentIntervalId);
-                        if (vlcPollingInterval === currentIntervalId) vlcPollingInterval = null;
+                        clearInterval(currentId);
+                        if (window.lampa_vlc_polling_timer === currentId) window.lampa_vlc_polling_timer = null;
+                        if (vlcPollingInterval === currentId) vlcPollingInterval = null;
                     }
                 });
         }, POLLING_INTERVAL_MS);
 
-        vlcPollingInterval = currentIntervalId;
+        vlcPollingInterval = window.lampa_vlc_polling_timer;
     }
 
     /**
