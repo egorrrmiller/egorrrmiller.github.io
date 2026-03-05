@@ -82,26 +82,11 @@
         var MAX_FAILED_ATTEMPTS = 15;
 
         function getVLCURL() {
-            var origin = window.location.origin || '';
-            var isLocal = origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1 || origin.indexOf('file://') !== -1 || origin.indexOf('chrome-extension') !== -1;
-
-            var url = '';
-            if (isLocal) {
-                url = 'http://localhost:' + port + '/requests/status.json';
-            } else {
-                url = 'http://localhost:3999/vlc/requests/status.json?port=' + port;
-            }
-
-            console.log(plugin_name, 'URL Debug:', {
-                origin: origin,
-                isLocal: isLocal,
-                vlc_port: port,
-                result_url: url
-            });
-            return url;
+            // Упрощено по просьбе пользователя (без лишних проверок на isLocal)
+            return 'http://localhost:' + port + '/requests/status.json';
         }
 
-        console.log(plugin_name, 'Мониторинг [' + currentRunId + ']: Запущен');
+        console.log(plugin_name, 'Мониторинг [' + currentRunId + ']: Запущен на порту ' + port);
 
         var poll = function () {
             if (window.lampa_vlc_last_run_id !== currentRunId) {
@@ -127,23 +112,35 @@
                     if (status.information && status.information.category && status.information.category.meta) {
                         var title = status.information.category.meta.title || '';
                         var filename = status.information.category.meta.filename || '';
-                        var hashMatch = (title + filename).match(/LampaHash="([^"]+)"/);
+                        var fullText = title + ' ' + filename;
+
+                        // Ищем хеш либо в теге LampaHash="", либо в приписке [LH:...]
+                        var hashMatch = fullText.match(/LampaHash="([^"]+)"/) || fullText.match(/\[LH:([^\]]+)\]/);
                         if (hashMatch) currentLampaHash = hashMatch[1];
                     }
 
-                    // Если файл в VLC сменился
-                    if (currentLampaHash && window.lampa_vlc_current_hash && currentLampaHash !== window.lampa_vlc_current_hash) {
-                        console.log(plugin_name, 'Смена серии на:', currentLampaHash);
-                        if (window.lampa_vlc_playlist_items) {
-                            var oldItem = window.lampa_vlc_playlist_items.find(function (i) {
-                                return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
-                            });
-                            if (oldItem && oldItem.timeline) {
-                                oldItem.timeline.percent = 100;
-                                oldItem.timeline.time = oldItem.timeline.duration || 1;
-                                Lampa.Timeline.update(oldItem.timeline);
+                    // Если в VLC играет что-то с нашим хешем, а мы об этом еще не знаем (первый запуск или смена)
+                    if (currentLampaHash && currentLampaHash !== window.lampa_vlc_current_hash) {
+                        console.log(plugin_name, 'Обнаружена серия:', currentLampaHash, '(старая была:', window.lampa_vlc_current_hash + ')');
+
+                        // Если это СМЕНА серии (старая была не пустой)
+                        if (window.lampa_vlc_current_hash) {
+                            if (window.lampa_vlc_playlist_items) {
+                                var oldItem = window.lampa_vlc_playlist_items.find(function (i) {
+                                    return i.timeline && i.timeline.hash === window.lampa_vlc_current_hash;
+                                });
+                                if (oldItem && oldItem.timeline) {
+                                    // Старую считаем досмотренной (99% или 100%)
+                                    oldItem.timeline.percent = 100;
+                                    oldItem.timeline.time = oldItem.timeline.duration || 1;
+                                    Lampa.Timeline.update(oldItem.timeline);
+                                }
                             }
                         }
+
+                        // Устанавливаем новый актуальный хеш
+                        window.lampa_vlc_current_hash = currentLampaHash;
+
                         var nextItem = null;
                         if (window.lampa_vlc_playlist_items) {
                             nextItem = window.lampa_vlc_playlist_items.find(function (i) {
@@ -151,8 +148,7 @@
                             });
                         }
                         if (nextItem) {
-                            window.lampa_vlc_current_hash = currentLampaHash;
-                            Lampa.Noty.show('Серия: ' + nextItem.title);
+                            Lampa.Noty.show('Серия: ' + (nextItem.title || nextItem.fname));
                         }
                     }
 
@@ -264,7 +260,8 @@
                                                 if (typeof title === 'string') {
                                                     title = title.replace(/<[^>]*>?/gm, '');
                                                 }
-                                                content.push('#EXTINF:-1 LampaHash="' + hash + '",' + title);
+                                                // Дублируем хеш в название для надежности
+                                                content.push('#EXTINF:-1 LampaHash="' + hash + '",' + title + ' [LH:' + hash + ']');
                                                 content.push(url);
                                             }
                                         }
