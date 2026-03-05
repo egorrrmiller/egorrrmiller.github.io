@@ -198,7 +198,25 @@
                                     var activity = Lampa.Activity.active();
                                     var movie = activity ? activity.card : {};
                                     event.element.poster = movie ? movie.img : '';
-                                    Lampa.Torrent.start(event.element, movie);
+
+                                    // Устанавливаем флаги на более долгий срок, 
+                                    // т.к. Lampa грузит серии асинхронно или через прелоадер.
+                                    window.lampa_vlc_playlist_enabled = true;
+
+                                    // Сохраняем элементы раздачи
+                                    window.lampa_vlc_playlist_items = event.items;
+
+                                    // Отключаем на случай, если мы не дошли до openPlayer
+                                    setTimeout(function () {
+                                        window.lampa_vlc_playlist_enabled = false;
+                                        window.lampa_vlc_playlist_items = null;
+                                    }, 10000); // 10 сек таймаут
+
+                                    if (event.item) {
+                                        event.item.trigger('hover:enter');
+                                    } else {
+                                        Lampa.Torrent.start(event.element, movie);
+                                    }
                                 } else {
                                     Lampa.Noty.show('Не удалось запустить торрент');
                                 }
@@ -234,10 +252,12 @@
 
                     console.log(plugin_name, 'Запускаем кастомный плейлист VLC...');
 
-                    var playlist = Lampa.Player.playlist() || [];
+                    // Берем плейлист либо из Player, либо сохраненный нами (если Player.playlist еще не обновился)
+                    var playlist = window.lampa_vlc_playlist_items || Lampa.Player.playlist() || [];
 
                     if (playlist.length === 0) {
                         // Если плейлиста нет, запускаем стандартно
+                        console.log(plugin_name, 'Плейлист пуст, откат на стандартный плеер');
                         return originalOpenPlayer.apply(this, arguments);
                     }
 
