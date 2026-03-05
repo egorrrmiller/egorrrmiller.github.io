@@ -30,32 +30,35 @@
      */
     function generateM3U(current_url, playlist_items) {
         var content = ['#EXTM3U'];
-        var startIndex = playlist_items.findIndex(function (item) {
-            return item.url === current_url || (item.url && typeof item.url === 'function');
-            // Примечание: парсинг function-источников (напр. url()) сложнее, 
-            // для простоты мы опираемся на строковые URL или индекс (если передадут)
-        });
 
-        // Если не нашли точное совпадение по URL (бывает при резолве балансеров), 
-        // попробуем найти по timeline hash
-        if (startIndex === -1 && window.lampa_vlc_current_hash) {
-            startIndex = playlist_items.findIndex(function (item) {
-                return item.timeline && item.timeline.hash === window.lampa_vlc_current_hash;
-            });
+        // В Lampa есть встроенный трекер позиции плейлиста
+        var startIndex = 0;
+        if (Lampa.Player.playlist && typeof Lampa.Player.playlist.position === 'function') {
+            startIndex = Lampa.Player.playlist.position() || 0;
         }
-
-        if (startIndex === -1) startIndex = 0;
 
         for (var i = startIndex; i < playlist_items.length; i++) {
             var item = playlist_items[i];
             var url = typeof item.url === 'string' ? item.url : '';
 
-            // К этому моменту URL обычно уже разрешен в строку, если это торренты
-            // Но мы допускаем, что если нет - пропускаем (балансеры с коллбэками сложнее втянуть в M3U заранее)
+            // Если URL еще функция, Lampa сама её резолвит. Попробуем извлечь из item
+            if (!url && typeof item.url === 'function') {
+                // Если мы не сможем вытащить URL, нам нечего скармливать VLC
+                console.log(plugin_name, "Item url is a function, skip adding to playlist");
+                continue;
+            }
 
             if (url) {
+                // Иногда URL это m3u8 балансера с &preload или торрент с &preload. Заменим на &play
+                url = url.replace('&preload', '&play');
+
                 var hash = item.timeline ? item.timeline.hash : ('hash_' + i);
-                var title = item.title || ('Episode ' + (i + 1));
+                var title = item.title || item.fname || ('Episode ' + (i + 1));
+
+                // Избавляемся от html-тегов в тайтле
+                if (typeof title === 'string') {
+                    title = title.replace(/<[^>]*>?/gm, '');
+                }
 
                 // Вшиваем наш Lampa Hash прямо в EXTM3U метаданные для последующего парсинга
                 content.push('#EXTINF:-1 LampaHash="' + hash + '",' + title);
