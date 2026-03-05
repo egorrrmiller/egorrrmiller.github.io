@@ -74,32 +74,37 @@
      * Опрашивает VLC, считывает текущий файл и обновляет тайлайн в Lampa
      */
     function startCustomTimecodePolling(port, password) {
-        if (vlcPollingInterval) clearInterval(vlcPollingInterval);
+        if (vlcPollingInterval) {
+            console.log(plugin_name, 'Остановка предыдущего мониторинга');
+            clearInterval(vlcPollingInterval);
+            vlcPollingInterval = null;
+        }
 
         var failedAttempts = 0;
-        var MAX_FAILED_ATTEMPTS = 10; // Даем 50 секунд на раздумья (при интервале 5с)
+        var MAX_FAILED_ATTEMPTS = 15; // Даем больше времени
+        var currentIntervalId = null;
 
-        function getVLCURL(port) {
+        function getVLCURL() {
             var proxy = !['localhost', 'file://'].includes(window.location.origin);
             var url = 'http://localhost:' + port + '/requests/status.json';
             if (proxy) url = 'http://localhost:4000/vlc/requests/status.json';
             return url;
         }
 
-        console.log(plugin_name, 'Запущен мониторинг VLC (интервал ' + POLLING_INTERVAL_MS + 'мс)');
+        console.log(plugin_name, 'Мониторинг VLC: ' + getVLCURL() + ' (пароль: ' + password + ')');
 
-        vlcPollingInterval = setInterval(function () {
+        currentIntervalId = setInterval(function () {
             var headers = {
                 'Authorization': 'Basic ' + btoa(':' + password)
             };
 
-            fetch(getVLCURL(port), { headers: headers })
+            fetch(getVLCURL(), { headers: headers })
                 .then(function (response) {
                     if (!response.ok) throw new Error('VLC API returned ' + response.status);
                     return response.json();
                 })
                 .then(function (status) {
-                    failedAttempts = 0; // Сбрасываем счетчик при успехе
+                    failedAttempts = 0;
 
                     // Парсим метаданные: ищем LampaHash
                     var currentLampaHash = null;
@@ -166,11 +171,13 @@
 
                     if (failedAttempts >= MAX_FAILED_ATTEMPTS) {
                         console.error(plugin_name, 'VLC не ответил вовремя, останавливаем поллинг');
-                        clearInterval(vlcPollingInterval);
-                        vlcPollingInterval = null;
+                        clearInterval(currentIntervalId);
+                        if (vlcPollingInterval === currentIntervalId) vlcPollingInterval = null;
                     }
                 });
         }, POLLING_INTERVAL_MS);
+
+        vlcPollingInterval = currentIntervalId;
     }
 
     /**
