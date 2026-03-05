@@ -82,26 +82,39 @@
         var MAX_FAILED_ATTEMPTS = 15;
 
         function getVLCURL() {
-            var proxy = !['localhost', 'file://'].includes(window.location.origin);
-            var url = 'http://localhost:' + port + '/requests/status.json';
-            if (proxy) url = 'http://localhost:4000/vlc/requests/status.json';
+            var origin = window.location.origin || '';
+            var isLocal = origin.indexOf('localhost') !== -1 || origin.indexOf('127.0.0.1') !== -1 || origin.indexOf('file://') !== -1 || origin.indexOf('chrome-extension') !== -1;
+
+            var url = '';
+            if (isLocal) {
+                url = 'http://localhost:' + port + '/requests/status.json';
+            } else {
+                url = 'http://localhost:3999/vlc/requests/status.json?port=' + port;
+            }
+
+            console.log(plugin_name, 'URL Debug:', {
+                origin: origin,
+                isLocal: isLocal,
+                vlc_port: port,
+                result_url: url
+            });
             return url;
         }
 
-        console.log(plugin_name, 'Мониторинг [' + currentRunId + ']: ' + getVLCURL() + ' (пароль: ' + password + ')');
+        console.log(plugin_name, 'Мониторинг [' + currentRunId + ']: Запущен');
 
         var poll = function () {
-            // Если ID сменился (запущен новый запуск), эта цепочка должна остановиться
             if (window.lampa_vlc_last_run_id !== currentRunId) {
                 console.log(plugin_name, 'Остановка устаревшей цепочки:', currentRunId);
                 return;
             }
 
+            var current_url = getVLCURL();
             var headers = {
                 'Authorization': 'Basic ' + btoa(':' + password)
             };
 
-            fetch(getVLCURL(), { headers: headers })
+            fetch(current_url, { headers: headers })
                 .then(function (response) {
                     if (!response.ok) throw new Error('VLC API error: ' + response.status);
                     return response.json();
