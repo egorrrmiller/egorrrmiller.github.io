@@ -78,7 +78,7 @@
         if (badges.dub) html += '<span class="appletv-badge dub">Дубляж</span>';
         html += '</div>';
 
-        container.find('.full-start__info').after(html);
+        container.find('.applecation__info').after(html);
     }
 
     /**
