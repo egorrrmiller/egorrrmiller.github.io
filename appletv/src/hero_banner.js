@@ -94,7 +94,8 @@
         if (e.type === 'ready' && Lampa.Storage.get('appletv_hero_banner', true)) {
             // Перехват построения главной страницы (Items -> Main)
             const originalCreate = Lampa.InteractionMain && Lampa.InteractionMain.prototype.create;
-            if (!originalCreate && Lampa.Activity.active().component == 'main') {
+            const active = Lampa.Activity.active();
+            if (!originalCreate && active && active.component == 'main') {
                 // Альтернативный способ для уже открытой main
                  injectBanner();
             }
