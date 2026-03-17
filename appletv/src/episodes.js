@@ -130,19 +130,4 @@
         return instance;
     };
 
-    /**
-     * Отображение общего количества серий (опционально)
-     */
-    Lampa.Listener.follow('full', function (e) {
-        if (e.type === 'build' && Lampa.Storage.get('appletv_show_episode_count', false)) {
-            const movie = e.data.movie;
-            if (movie && movie.number_of_episodes) {
-                const infoBlock = e.object.find('.full-start__info');
-                if (infoBlock.length && infoBlock.html().indexOf(movie.number_of_episodes) === -1) {
-                    infoBlock.append('<span>' + movie.number_of_episodes + ' серий</span>');
-                }
-            }
-        }
-    });
-
 })();
