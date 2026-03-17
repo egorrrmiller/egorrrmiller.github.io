@@ -43,6 +43,8 @@
                 if (!activity || !activity.activity) return;
 
                 const movie = e.data.movie;
+                if (!movie || !e.object) return;
+
                 const container = e.object.find('.full-start__right').parent();
 
                 // Контейнер для лого
@@ -83,6 +85,8 @@
 
         Lampa.Listener.follow('full', function (e) {
             if (e.type === 'build') {
+                if (!e.object || !e.data || !e.data.movie) return;
+
                 const descBlock = e.object.find('.full-start__text');
                 const movie = e.data.movie;
                 

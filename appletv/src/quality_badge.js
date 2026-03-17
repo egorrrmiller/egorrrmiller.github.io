@@ -136,8 +136,8 @@
     Lampa.Listener.follow('full', function (e) {
         if (e.type === 'build') {
             const activity = Lampa.Activity.active();
-            const movie = e.data.movie;
-            if (active && movie) {
+            const movie = e.data && e.data.movie;
+            if (activity && activity.activity && movie) {
                 // Вызываем парсер для оценки качества
                 setTimeout(() => { triggerParser(movie, activity); }, 1500); 
             }
