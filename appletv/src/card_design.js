@@ -1,8 +1,6 @@
 (function () {
     'use strict';
 
-    if (!Lampa.Platform.screen('tv')) return;
-
     // Стили перенесены из Applecation
     var styles = '.appletv-card-logo-container { position: absolute; top: 2em; left: 3em; max-width: 400px; max-height: 15vh; z-index: 10; pointer-events: none; display: flex; align-items: flex-end; }' +
     '.appletv-card__logo { max-width: 100%; max-height: 100%; object-fit: contain; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)); }' +

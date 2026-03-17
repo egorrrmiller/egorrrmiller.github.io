@@ -227,11 +227,6 @@
         
         console.log('Apple TV', 'v' + APPLETV_VERSION, 'Loader init');
 
-        if (!Lampa.Platform.screen('tv')) {
-            console.log('Apple TV', 'TV mode only');
-            return;
-        }
-
         // Начальная настройка body-классов
         if (!Lampa.Storage.get('appletv_liquid_glass', true)) {
             $('body').addClass('appletv--no-liquid-glass');

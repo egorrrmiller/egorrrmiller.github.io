@@ -1,8 +1,6 @@
 (function () {
     'use strict';
 
-    if (!Lampa.Platform.screen('tv')) return;
-
     // Стили для Hero Баннера
     var styles = '.appletv-hero { position: relative; width: 100%; height: 65vh; min-height: 400px; margin-bottom: -150px; border-radius: 0 0 20px 20px; overflow: hidden; opacity: 0; transition: opacity 0.5s ease; z-index: 10; margin-top: -2em; pointer-events: none; }' +
     '.appletv-hero.ready { opacity: 1; }' +

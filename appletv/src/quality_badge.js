@@ -1,8 +1,6 @@
 (function () {
     'use strict';
 
-    if (!Lampa.Platform.screen('tv')) return;
-
     // Стили для бейджей качества
     var styles = '.appletv-quality-badges { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; margin-bottom: 15px; }' +
     '.appletv-badge { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: rgba(255,255,255,0.9); padding: 4px 10px; border-radius: 6px; font-size: 0.9em; font-weight: 600; letter-spacing: 0.5px; backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }' +
